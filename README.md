@@ -1,6 +1,25 @@
 # cargo-flamegraph
 
-Usage:
+A simple cargo plugin that generates a flamegraph
+for a workload.
+
+Currently only linux is supported via perf, but
+this is going to change as inferno gains support
+for others.
+
+## Installation
+
+```
+cargo install flamegraph
+```
+
+This will make the `cargo-flamegraph` binary
+available in your cargo binary directory.
+On linux systems this is usually something
+like `~/.cargo/bin`.
+
+## Usage
+
 ```
 # defaults to profiling cargo run, which will
 # also profile the cargo compilation process
@@ -17,12 +36,7 @@ cargo flamegraph --bin=stress2
 cargo flamegraph --exec="sleep 10"
 ```
 
-A simple cargo plugin that generates a flamegraph
-for a workload.
-
-Currently only linux is supported via perf, but
-this is going to change as inferno gains support
-for others.
+## Enabling perf for use by unpriviledged users
 
 To enable perf without running as root, you may
 lower the `perf_event_paranoid` value in proc
