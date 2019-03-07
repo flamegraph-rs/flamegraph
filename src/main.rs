@@ -19,12 +19,12 @@ fn usage() -> ! {
 }
 
 fn main() -> Result<(), ()> {
-    let cmd: String = if args().len() == 2 {
+    let cmd: String = if args().len() <= 2 {
         "cargo run".into()
-    } else if args().nth(1).unwrap() == "-h" {
+    } else if args().nth(2).unwrap() == "-h" {
         usage();
     } else {
-        args().skip(1).collect::<Vec<_>>().join(" ")
+        args().skip(2).collect::<Vec<_>>().join(" ")
     };
 
     let gen = format!("perf record -F 99 -g {}", cmd);
