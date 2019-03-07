@@ -40,7 +40,7 @@ cargo flamegraph --exec="sleep 10"
 
 ```
 USAGE:
-    cargo-flamegraph flamegraph [FLAGS] [OPTIONS]
+    cargo flamegraph [FLAGS] [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information
