@@ -18,7 +18,7 @@ available in your cargo binary directory.
 On linux systems this is usually something
 like `~/.cargo/bin`.
 
-## Usage
+## Examples
 
 ```
 # defaults to profiling cargo run, which will
@@ -34,6 +34,24 @@ cargo flamegraph --bin=stress2
 
 # if you'd like to profile an arbitrary executable:
 cargo flamegraph --exec="sleep 10"
+```
+
+## Usage
+
+```
+USAGE:
+    cargo-flamegraph flamegraph [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -r, --release    Activate release mode
+    -V, --version    Prints version information
+
+OPTIONS:
+    -b, --bin <bin>              Binary to run
+    -e, --exec <exec>            Other command to run
+    -f, --features <features>    Build features to enable
+    -o, --output <output>        Output file, flamegraph.svg if not present
 ```
 
 ## Enabling perf for use by unpriviledged users
