@@ -1,0 +1,8 @@
+[package]
+name = "cargo-flamegraph"
+version = "0.1.0"
+authors = ["Tyler Neely <tyler.neely@ferrous-systems.com>"]
+edition = "2018"
+
+[dependencies]
+inferno = { git = "https://github.com/jonhoo/inferno", rev = "3671c0c764ba902b1097497ddd249fc73673b75a" }
