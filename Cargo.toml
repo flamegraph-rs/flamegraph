@@ -1,8 +1,19 @@
 [package]
-name = "cargo-flamegraph"
+name = "flamegraph"
 version = "0.1.0"
 authors = ["Tyler Neely <tyler.neely@ferrous-systems.com>"]
+description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/ferrous-systems/cargo-flamegraph"
+keywords = ["perf", "flamegraph", "profiling", "cargo", "cargo-subcommand"]
+categories = ["command-line-utilities", "development-tools::profiling", "visualization", "development-tools::cargo-plugins"]
+readme = "README.md"
 edition = "2018"
 
+[[bin]]
+name = "cargo-flamegraph"
+path = "src/main.rs"
+
 [dependencies]
-inferno = { git = "https://github.com/jonhoo/inferno", rev = "3671c0c764ba902b1097497ddd249fc73673b75a" }
+inferno = "0.4"
+structopt = "0.2.14"

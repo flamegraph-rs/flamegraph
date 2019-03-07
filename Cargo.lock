@@ -95,13 +95,6 @@ version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "cargo-flamegraph"
-version = "0.1.0"
-dependencies = [
- "inferno 0.3.0 (git+https://github.com/jonhoo/inferno?rev=3671c0c764ba902b1097497ddd249fc73673b75a)",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -204,6 +197,14 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "flamegraph"
+version = "0.1.0"
+dependencies = [
+ "inferno 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "structopt 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -268,8 +269,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "inferno"
-version = "0.3.0"
-source = "git+https://github.com/jonhoo/inferno?rev=3671c0c764ba902b1097497ddd249fc73673b75a#3671c0c764ba902b1097497ddd249fc73673b75a"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "addr2line 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -816,7 +817,7 @@ dependencies = [
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum humantime 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3ca7e5f2e110db35f93b837c81797f3714500b81d517bf20c431b16d3ca4f114"
 "checksum indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7e81a7c05f79578dbc15793d8b619db9ba32b4577003ef3af1a91c416798c58d"
-"checksum inferno 0.3.0 (git+https://github.com/jonhoo/inferno?rev=3671c0c764ba902b1097497ddd249fc73673b75a)" = "<none>"
+"checksum inferno 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fe1ac86eb58d9298cd1bc6297554194943ff8fa335b4460416a81093635d7685"
 "checksum intervaltree 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "af39074dd8d5eff756ddea3d8f34c7ae287d4dadb6f29fb1b67ca6b3f5036482"
 "checksum itoa 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1306f3464951f30e30d12373d31c79fbd52d236e5e896fd92f96ec7babbbe60b"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
