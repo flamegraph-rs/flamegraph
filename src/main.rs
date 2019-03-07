@@ -32,6 +32,10 @@ struct Opt {
     /// Output file, flamegraph.svg if not present
     #[structopt(parse(from_os_str), short = "o", long = "output")]
     output: Option<PathBuf>,
+
+    /// Build features to enable
+    #[structopt(short = "f", long = "features")]
+    features: Option<String>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -68,6 +72,11 @@ impl Into<Command> for Opt {
             if let Some(bin) = self.bin {
                 cmd.push("--bin".into());
                 cmd.push(bin.into());
+            }
+
+            if let Some(features) = self.features {
+                cmd.push("--features".into());
+                cmd.push(features.into());
             }
         };
 
