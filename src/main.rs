@@ -6,14 +6,20 @@ use std::{
 };
 
 #[cfg(target_os = "linux")]
-use inferno::collapse::perf::{Folder, Options as CollapseOptions};
+use inferno::collapse::perf::{
+    Folder, Options as CollapseOptions,
+};
 
 #[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
+use inferno::collapse::dtrace::{
+    Folder, Options as CollapseOptions,
+};
 
 use inferno::{
     collapse::Collapse,
-    flamegraph::{from_reader, Options as FlamegraphOptions},
+    flamegraph::{
+        from_reader, Options as FlamegraphOptions,
+    },
 };
 
 use structopt::StructOpt;
@@ -33,7 +39,11 @@ struct Opt {
     exec: Option<String>,
 
     /// Output file, flamegraph.svg if not present
-    #[structopt(parse(from_os_str), short = "o", long = "output")]
+    #[structopt(
+        parse(from_os_str),
+        short = "o",
+        long = "output"
+    )]
     output: Option<PathBuf>,
 
     /// Build features to enable
@@ -55,9 +65,11 @@ enum Opts {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str = "could not spawn perf";
-    pub const WAIT_ERROR: &'static str = "unable to wait for perf \
-                                          child command to exit";
+    pub const SPAWN_ERROR: &'static str =
+        "could not spawn perf";
+    pub const WAIT_ERROR: &'static str =
+        "unable to wait for perf \
+         child command to exit";
 
     pub(crate) fn initial_command(_: &Opt) -> Command {
         let mut command = Command::new("perf");
@@ -82,24 +94,29 @@ mod arch {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace \
-                                          child command to exit";
+    pub const SPAWN_ERROR: &'static str =
+        "could not spawn dtrace";
+    pub const WAIT_ERROR: &'static str =
+        "unable to wait for dtrace \
+         child command to exit";
 
-    pub fn initial_command(opt: &Opt) -> Command {
-        let basename: String = if let Some(exec) = self.exec {
-            let first = exec
+    pub(crate) fn initial_command(opt: &Opt) -> Command {
+        let basename: String =
+            if let Some(ref exec) = opt.exec {
+                let first = exec
                 .split_whitespace()
                 .nth(0)
-                .expect("the exec argument expects a binary to run");
+                .expect(
+                "the exec argument expects a binary to run",
+            );
 
-            exec.split('/').last().unwrap()
-        } else {
-            "cargo".into()
-        };
+                first.split('/').last().unwrap().into()
+            } else {
+                "cargo".into()
+            };
 
         let dtrace_script = format!(
-            "profile-997 /execname == \"{}\"/ { @[ustack(100)] = count(); }",
+            r#"profile-997 /execname == "{}"/ {{ @[ustack(100)] = count(); }}"#,
             basename
         );
 
@@ -113,6 +130,21 @@ mod arch {
         }
 
         command
+    }
+
+    pub fn output() -> Vec<u8> {
+        let mut buf = vec![];
+        let mut f = File::open("out.stacks").expect(
+            "failed to open dtrace output file out.stacks",
+        );
+
+        use std::io::Read;
+        f.read_to_end(&mut buf).expect(
+            "failed to read dtrace expected \
+             output file out.stacks",
+        );
+
+        buf
     }
 }
 
@@ -156,11 +188,15 @@ impl Into<Command> for Opt {
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    let flamegraph_filename = opt.output.take().unwrap_or("flamegraph.svg".into());
+    let flamegraph_filename = opt
+        .output
+        .take()
+        .unwrap_or("flamegraph.svg".into());
 
     let mut command: Command = opt.into();
 
-    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
+    let mut recorder =
+        command.spawn().expect(arch::SPAWN_ERROR);
     recorder.wait().expect(arch::WAIT_ERROR);
 
     let output = arch::output();
@@ -175,12 +211,16 @@ fn main() {
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
-        .expect("unable to collapse generated profile data");
+        .expect(
+            "unable to collapse generated profile data",
+        );
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    let flamegraph_file =
-        File::create(flamegraph_filename).expect("unable to create flamegraph.svg output file");
+    let flamegraph_file = File::create(flamegraph_filename)
+        .expect(
+            "unable to create flamegraph.svg output file",
+        );
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
