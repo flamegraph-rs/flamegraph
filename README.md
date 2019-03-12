@@ -59,7 +59,7 @@ OPTIONS:
     -o, --output <output>        Output file, flamegraph.svg if not present
 ```
 
-## Enabling perf for use by unpriviledged users
+## Enabling perf for use by unprivileged users
 
 To enable perf without running as root, you may
 lower the `perf_event_paranoid` value in proc
