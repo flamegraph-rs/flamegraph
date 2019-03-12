@@ -9,6 +9,8 @@ Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windo
 
 ## Installation
 
+`flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
+
 ```
 cargo install flamegraph
 ```
@@ -31,6 +33,9 @@ cargo flamegraph --release
 
 # if you'd like to profile a specific binary:
 cargo flamegraph --bin=stress2
+
+# if you want to pass arguments, as you would with cargo run:
+cargo flamegraph -- my-command --my-arg my-value -m -f 
 
 # if you'd like to profile an arbitrary executable:
 cargo flamegraph --exec="/path/to/my/binary --some-arg 5"
