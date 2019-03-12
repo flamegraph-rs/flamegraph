@@ -34,8 +34,12 @@ struct Opt {
     release: bool,
 
     /// Binary to run
-    #[structopt(short = "b", long = "bin")]
+    #[structopt(short = "b", long = "bin", conflicts_with = "example")]
     bin: Option<String>,
+
+    /// Example to run
+    #[structopt(long = "example", conflicts_with = "bin")]
+    example: Option<String>,
 
     /// Other command to run
     #[structopt(short = "e", long = "exec")]
@@ -181,6 +185,11 @@ fn build(opt: &Opt) {
         cmd.arg(bin);
     }
 
+    if let Some(ref example) = opt.example {
+        cmd.arg("--example");
+        cmd.arg(example);
+    }
+
     if let Some(ref features) = opt.features {
         cmd.arg("--features");
         cmd.arg(features);
@@ -191,7 +200,7 @@ fn build(opt: &Opt) {
         .expect("failed to spawn cargo build command");
 
     let exit_status = child.wait().expect(
-        "failed to wait for cargo buld child to finish",
+        "failed to wait for cargo build child to finish",
     );
 
     if !exit_status.success() {
@@ -220,6 +229,10 @@ fn workload(opt: &Opt) -> String {
         binary_path.push("debug");
     }
 
+    if opt.example.is_some() {
+        binary_path.push("examples");
+    }
+
     let targets: Vec<String> = metadata
         .packages
         .into_iter()
@@ -237,7 +250,8 @@ fn workload(opt: &Opt) -> String {
         std::process::exit(1);
     }
 
-    let target: &String = if let Some(ref bin) = opt.bin {
+    let explicit_bin = opt.bin.as_ref().or(opt.example.as_ref());
+    let target: &String = if let Some(ref bin) = explicit_bin {
         if targets.contains(&bin) {
             bin
         } else {
@@ -253,8 +267,8 @@ fn workload(opt: &Opt) -> String {
     } else {
         eprintln!(
             "several possible targets found: {:?}, \
-             please pass the --bin argument to cargo flamegraph \
-             to choose one of them",
+             please pass `--bin <binary>` or `--example <example>` \
+             to cargo flamegraph to choose one of them",
             targets
         );
         std::process::exit(1);
