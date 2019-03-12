@@ -1,11 +1,12 @@
 # cargo-flamegraph
 
 A simple cargo plugin that generates a flamegraph
-for a workload.
+for a given workload.
 
-Currently only linux is supported via perf, but
-this is going to change as inferno gains support
-for others.
+Uses perf on linux and dtrace otherwise.
+
+Get in touch if you're interested in helping to add
+Windows support!
 
 ## Installation
 
@@ -15,7 +16,7 @@ cargo install flamegraph
 
 This will make the `cargo-flamegraph` binary
 available in your cargo binary directory.
-On linux systems this is usually something
+On most systems this is usually something
 like `~/.cargo/bin`.
 
 ## Examples
@@ -33,7 +34,7 @@ cargo flamegraph --release
 cargo flamegraph --bin=stress2
 
 # if you'd like to profile an arbitrary executable:
-cargo flamegraph --exec="sleep 10"
+cargo flamegraph --exec="/path/to/my/binary --some-arg 5"
 ```
 
 ## Usage
