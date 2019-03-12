@@ -25,6 +25,9 @@ use inferno::{
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
+#[structopt(raw(
+    setting = "structopt::clap::AppSettings::TrailingVarArg"
+))]
 struct Opt {
     /// Activate release mode
     #[structopt(short = "r", long = "release")]
@@ -49,6 +52,8 @@ struct Opt {
     /// Build features to enable
     #[structopt(short = "f", long = "features")]
     features: Option<String>,
+
+    trailing_arguments: Vec<String>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -135,11 +140,6 @@ mod arch {
 
         command.arg("-c");
         command.arg(&workload);
-
-        println!(
-            "dtrace -n \"{}\" -o cargo-flamegraph.stacks -c \"{}\"",
-            dtrace_script, workload
-        );
 
         command
     }
@@ -262,7 +262,11 @@ fn workload(opt: &Opt) -> String {
 
     binary_path.push(target);
 
-    binary_path.to_string_lossy().into()
+    format!(
+        "{} {}",
+        binary_path.to_string_lossy(),
+        opt.trailing_arguments.join(" ")
+    )
 }
 
 fn main() {
