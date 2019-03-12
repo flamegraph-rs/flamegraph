@@ -45,7 +45,7 @@ cargo flamegraph --exec="/path/to/my/binary --some-arg 5"
 
 ```
 USAGE:
-    cargo flamegraph [FLAGS] [OPTIONS]
+    cargo flamegraph [FLAGS] [OPTIONS] -- [[ARGS_FOR_YOUR_BINARY]]
 
 FLAGS:
     -h, --help       Prints help information
@@ -69,4 +69,17 @@ be acceptable for your security needs etc...
 
 ```bash
 echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
+## Improving output when running with `--release`
+
+Due to optimizations etc... sometimes the quality
+of the information presented in the flamegraph will
+suffer when profiling release builds. To counter this
+to some extent, you may set the following in your 
+`Cargo.toml` file:
+
+```
+[profile.release]
+debug = true
 ```
