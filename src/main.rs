@@ -71,17 +71,17 @@ mod arch {
         "unable to wait for perf \
          child command to exit";
 
-    pub(crate) fn initial_command(
-        workload_args: Vec<String>,
-    ) -> Command {
+    pub(crate) fn initial_command(opt: &Opt) -> Command {
         let mut command = Command::new("perf");
 
         for arg in "record -F 99 -g".split_whitespace() {
             command.arg(arg);
         }
 
-        for item in workload_args {
-            command.arg(arg);
+        let workload = workload(opt);
+
+        for item in workload.split_whitespace() {
+            command.arg(item);
         }
 
         command
@@ -143,9 +143,8 @@ mod arch {
 
     pub fn output() -> Vec<u8> {
         let mut buf = vec![];
-        let mut f = File::open("cargo-flamegraph.stacks").expect(
-            "failed to open dtrace output file cargo-flamegraph.stacks",
-        );
+        let mut f = File::open("cargo-flamegraph.stacks")
+            .expect("failed to open dtrace output file cargo-flamegraph.stacks");
 
         use std::io::Read;
         f.read_to_end(&mut buf).expect(
@@ -249,9 +248,12 @@ fn workload(opt: &Opt) -> String {
     } else if targets.len() == 1 {
         &targets[0]
     } else {
-        eprintln!("several possible targets found: {:?}, \
-        please pass the --bin argument to cargo flamegraph \
-        to choose one of them", targets);
+        eprintln!(
+            "several possible targets found: {:?}, \
+             please pass the --bin argument to cargo flamegraph \
+             to choose one of them",
+            targets
+        );
         std::process::exit(1);
     };
 
