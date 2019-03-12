@@ -124,6 +124,9 @@ mod arch {
             basename
         );
 
+        command.arg("-x");
+        command.arg("ustackframes=100");
+
         command.arg("-n");
         command.arg(&dtrace_script);
 

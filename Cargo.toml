@@ -1,6 +1,6 @@
 [package]
 name = "flamegraph"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Tyler Neely <tyler.neely@ferrous-systems.com>"]
 description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
 license = "MIT/Apache-2.0"
