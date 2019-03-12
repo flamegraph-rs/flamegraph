@@ -1,7 +1,8 @@
 # cargo-flamegraph
 
 A simple cargo plugin that generates a flamegraph
-for a given workload.
+for a given workload. It can be used to profile anything,
+not just Rust projects! No perl or pipes required <3
 
 Uses perf on linux and dtrace otherwise.
 
