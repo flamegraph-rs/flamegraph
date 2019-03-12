@@ -6,28 +6,20 @@ use std::{
 };
 
 #[cfg(target_os = "linux")]
-use inferno::collapse::perf::{
-    Folder, Options as CollapseOptions,
-};
+use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 
 #[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{
-    Folder, Options as CollapseOptions,
-};
+use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 
 use inferno::{
     collapse::Collapse,
-    flamegraph::{
-        from_reader, Options as FlamegraphOptions,
-    },
+    flamegraph::{from_reader, Options as FlamegraphOptions},
 };
 
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(raw(
-    setting = "structopt::clap::AppSettings::TrailingVarArg"
-))]
+#[structopt(raw(setting = "structopt::clap::AppSettings::TrailingVarArg"))]
 struct Opt {
     /// Activate release mode
     #[structopt(short = "r", long = "release")]
@@ -42,11 +34,7 @@ struct Opt {
     exec: Option<String>,
 
     /// Output file, flamegraph.svg if not present
-    #[structopt(
-        parse(from_os_str),
-        short = "o",
-        long = "output"
-    )]
+    #[structopt(parse(from_os_str), short = "o", long = "output")]
     output: Option<PathBuf>,
 
     /// Build features to enable
@@ -70,11 +58,9 @@ enum Opts {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str =
-        "could not spawn perf";
-    pub const WAIT_ERROR: &'static str =
-        "unable to wait for perf \
-         child command to exit";
+    pub const SPAWN_ERROR: &'static str = "could not spawn perf";
+    pub const WAIT_ERROR: &'static str = "unable to wait for perf \
+                                          child command to exit";
 
     pub(crate) fn initial_command(opt: &Opt) -> Command {
         let mut command = Command::new("perf");
@@ -105,29 +91,16 @@ mod arch {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str =
-        "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str =
-        "unable to wait for dtrace \
-         child command to exit";
+    pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
+    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace \
+                                          child command to exit";
 
     pub(crate) fn initial_command(opt: &Opt) -> Command {
         let workload = workload(opt);
 
         let mut command = Command::new("dtrace");
 
-        let first = workload
-            .split_whitespace()
-            .nth(0)
-            .expect("no command given");
-
-        let basename: String =
-            first.split('/').last().unwrap().into();
-
-        let dtrace_script = format!(
-            r#"profile-997 /execname == "{}"/ {{ @[ustack(100)] = count(); }}"#,
-            basename
-        );
+        let dtrace_script = "profile-997 /pid == $target/ { @[ustack(100)] = count(); }";
 
         command.arg("-x");
         command.arg("ustackframes=100");
@@ -155,11 +128,10 @@ mod arch {
              output file cargo-flamegraph.stacks",
         );
 
-        std::fs::remove_file("cargo-flamegraph.stacks")
-            .expect(
-                "unable to remove cargo-flamegraph.stacks \
-                 temporary file",
-            );
+        std::fs::remove_file("cargo-flamegraph.stacks").expect(
+            "unable to remove cargo-flamegraph.stacks \
+             temporary file",
+        );
 
         buf
     }
@@ -186,13 +158,11 @@ fn build(opt: &Opt) {
         cmd.arg(features);
     }
 
-    let mut child = cmd
-        .spawn()
-        .expect("failed to spawn cargo build command");
+    let mut child = cmd.spawn().expect("failed to spawn cargo build command");
 
-    let exit_status = child.wait().expect(
-        "failed to wait for cargo buld child to finish",
-    );
+    let exit_status = child
+        .wait()
+        .expect("failed to wait for cargo buld child to finish");
 
     if !exit_status.success() {
         eprintln!("cargo build failed: {:?}", child.stderr);
@@ -205,8 +175,7 @@ fn workload(opt: &Opt) -> String {
         return exec.clone();
     }
 
-    let mut metadata_cmd =
-        cargo_metadata::MetadataCommand::new();
+    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
     let metadata = metadata_cmd
         .exec()
@@ -274,17 +243,12 @@ fn main() {
 
     build(&opt);
 
-    let flamegraph_filename = opt
-        .output
-        .take()
-        .unwrap_or("flamegraph.svg".into());
+    let flamegraph_filename = opt.output.take().unwrap_or("flamegraph.svg".into());
 
     let mut command = arch::initial_command(&opt);
 
-    let mut recorder =
-        command.spawn().expect(arch::SPAWN_ERROR);
-    let exit_status =
-        recorder.wait().expect(arch::WAIT_ERROR);
+    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
+    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
 
     if !exit_status.success() {
         eprintln!("failed to sample program");
@@ -303,16 +267,12 @@ fn main() {
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
-        .expect(
-            "unable to collapse generated profile data",
-        );
+        .expect("unable to collapse generated profile data");
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    let flamegraph_file = File::create(flamegraph_filename)
-        .expect(
-            "unable to create flamegraph.svg output file",
-        );
+    let flamegraph_file =
+        File::create(flamegraph_filename).expect("unable to create flamegraph.svg output file");
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
