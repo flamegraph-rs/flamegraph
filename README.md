@@ -5,8 +5,7 @@ for a given workload.
 
 Uses perf on linux and dtrace otherwise.
 
-Get in touch if you're interested in helping to add
-Windows support!
+Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D 
 
 ## Installation
 
