@@ -274,7 +274,7 @@ that allows us to reason about appropriate queue lengths for our systems
 
 # Ferrous Systems
 
-This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems)
+This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems.com)
 to help their customers and workshop attendees develop high performance systems
 in the Rust programming language. If you would like to work with some of
 the world's most experienced Rust systems engineers, either for
