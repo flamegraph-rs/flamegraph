@@ -6,27 +6,39 @@ use std::{
 };
 
 #[cfg(target_os = "linux")]
-use inferno::collapse::perf::{Folder, Options as CollapseOptions};
+use inferno::collapse::perf::{
+    Folder, Options as CollapseOptions,
+};
 
 #[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
+use inferno::collapse::dtrace::{
+    Folder, Options as CollapseOptions,
+};
 
 use inferno::{
     collapse::Collapse,
-    flamegraph::{from_reader, Options as FlamegraphOptions},
+    flamegraph::{
+        from_reader, Options as FlamegraphOptions,
+    },
 };
 
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::TrailingVarArg"))]
+#[structopt(raw(
+    setting = "structopt::clap::AppSettings::TrailingVarArg"
+))]
 struct Opt {
     /// Build with the dev profile
     #[structopt(long = "dev")]
     dev: bool,
 
     /// Binary to run
-    #[structopt(short = "b", long = "bin", conflicts_with = "example")]
+    #[structopt(
+        short = "b",
+        long = "bin",
+        conflicts_with = "example"
+    )]
     bin: Option<String>,
 
     /// Example to run
@@ -38,7 +50,11 @@ struct Opt {
     exec: Option<String>,
 
     /// Output file, flamegraph.svg if not present
-    #[structopt(parse(from_os_str), short = "o", long = "output")]
+    #[structopt(
+        parse(from_os_str),
+        short = "o",
+        long = "output"
+    )]
     output: Option<PathBuf>,
 
     /// Build features to enable
@@ -62,9 +78,11 @@ enum Opts {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str = "could not spawn perf";
-    pub const WAIT_ERROR: &'static str = "unable to wait for perf \
-                                          child command to exit";
+    pub const SPAWN_ERROR: &'static str =
+        "could not spawn perf";
+    pub const WAIT_ERROR: &'static str =
+        "unable to wait for perf \
+         child command to exit";
 
     pub(crate) fn initial_command(opt: &Opt) -> Command {
         let mut command = Command::new("perf");
@@ -95,9 +113,11 @@ mod arch {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace \
-                                          child command to exit";
+    pub const SPAWN_ERROR: &'static str =
+        "could not spawn dtrace";
+    pub const WAIT_ERROR: &'static str =
+        "unable to wait for dtrace \
+         child command to exit";
 
     pub(crate) fn initial_command(opt: &Opt) -> Command {
         let workload = workload(opt);
@@ -132,10 +152,11 @@ mod arch {
              output file cargo-flamegraph.stacks",
         );
 
-        std::fs::remove_file("cargo-flamegraph.stacks").expect(
-            "unable to remove cargo-flamegraph.stacks \
-             temporary file",
-        );
+        std::fs::remove_file("cargo-flamegraph.stacks")
+            .expect(
+                "unable to remove cargo-flamegraph.stacks \
+                 temporary file",
+            );
 
         buf
     }
@@ -167,27 +188,58 @@ fn build(opt: &Opt) {
         cmd.arg(features);
     }
 
-    let mut child = cmd.spawn().expect("failed to spawn cargo build command");
+    let mut child = cmd
+        .spawn()
+        .expect("failed to spawn cargo build command");
 
-    let exit_status = child
-        .wait()
-        .expect("failed to wait for cargo build child to finish");
+    let exit_status = child.wait().expect(
+        "failed to wait for cargo build child to finish",
+    );
 
     if !opt.dev {
-        let output = cmd.output().expect("failed to execute cargo build command");
-        if let Ok(stdout) = std::str::from_utf8(&output.stdout) {
-            if !stdout.contains("debuginfo") {
-                eprintln!(
-                    "\
-WARNING: building without debuginfo
+        cmd.arg("--message-format=json");
 
-Enable symbol information by adding the following lines to Cargo.toml:
+        let output: Vec<u8> = cmd
+            .output()
+            .expect("failed to execute cargo build command")
+            .stdout;
 
-[profile.release]
-debug = true
-"
-                )
+        let messages =
+            cargo_metadata::parse_messages(&*output);
+
+        let mut has_debuginfo = false;
+
+        // This is an extremely coarse check to see
+        // if any of our build artifacts have debuginfo
+        // enabled.
+        for message in messages {
+            let artifact = if let Ok(
+                cargo_metadata::Message::CompilerArtifact(
+                    artifact,
+                ),
+            ) = message
+            {
+                artifact
+            } else {
+                continue;
+            };
+
+            if workload(opt).contains(&artifact.target.name)
+                && artifact.profile.debuginfo.unwrap_or(0)
+                    != 0
+            {
+                has_debuginfo = true;
             }
+        }
+
+        if !has_debuginfo {
+            eprintln!(
+                "\nWARNING: building without debuginfo. \
+                 Enable symbol information by adding \
+                 the following lines to Cargo.toml:\n"
+            );
+            eprintln!("[profile.release]");
+            eprintln!("debug = true\n");
         }
     }
 
@@ -202,7 +254,8 @@ fn workload(opt: &Opt) -> String {
         return exec.clone();
     }
 
-    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
+    let mut metadata_cmd =
+        cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
     let metadata = metadata_cmd
         .exec()
@@ -237,8 +290,11 @@ fn workload(opt: &Opt) -> String {
         std::process::exit(1);
     }
 
-    let explicit_bin = opt.bin.as_ref().or(opt.example.as_ref());
-    let target: &String = if let Some(ref bin) = explicit_bin {
+    let explicit_bin =
+        opt.bin.as_ref().or(opt.example.as_ref());
+    let target: &String = if let Some(ref bin) =
+        explicit_bin
+    {
         if targets.contains(&bin) {
             bin
         } else {
@@ -275,12 +331,17 @@ fn main() {
 
     build(&opt);
 
-    let flamegraph_filename = opt.output.take().unwrap_or("flamegraph.svg".into());
+    let flamegraph_filename = opt
+        .output
+        .take()
+        .unwrap_or("flamegraph.svg".into());
 
     let mut command = arch::initial_command(&opt);
 
-    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
-    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
+    let mut recorder =
+        command.spawn().expect(arch::SPAWN_ERROR);
+    let exit_status =
+        recorder.wait().expect(arch::WAIT_ERROR);
 
     if !exit_status.success() {
         eprintln!("failed to sample program");
@@ -299,12 +360,16 @@ fn main() {
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
-        .expect("unable to collapse generated profile data");
+        .expect(
+            "unable to collapse generated profile data",
+        );
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    let flamegraph_file =
-        File::create(flamegraph_filename).expect("unable to create flamegraph.svg output file");
+    let flamegraph_file = File::create(flamegraph_filename)
+        .expect(
+            "unable to create flamegraph.svg output file",
+        );
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
