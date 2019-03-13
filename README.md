@@ -1,6 +1,8 @@
 # cargo-flamegraph
 
-[![colorized flamegraph output](example.svg)](example.svg)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ferrous-systems/cargo-flamegraph/master/example.svg" width="20%" height="auto" />
+</p>
 
 A simple cargo plugin that generates a flamegraph
 for a given workload. It can be used to profile anything,
