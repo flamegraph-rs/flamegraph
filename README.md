@@ -1,8 +1,6 @@
 # cargo-flamegraph
 
-<p align="center">
-  <img alt="example flamegraph image" src="https://raw.githubusercontent.com/ferrous-systems/cargo-flamegraph/master/example.svg" width="20%" height="auto" />
-</p>
+[![colorized flamegraph output](example.svg)](example.svg)
 
 A simple cargo plugin that generates a flamegraph
 for a given workload. It can be used to profile anything,
@@ -40,7 +38,7 @@ cargo flamegraph --release
 cargo flamegraph --bin=stress2
 
 # if you want to pass arguments, as you would with cargo run:
-cargo flamegraph -- my-command --my-arg my-value -m -f 
+cargo flamegraph -- my-command --my-arg my-value -m -f
 
 # if you'd like to profile an arbitrary executable:
 cargo flamegraph --exec="/path/to/my/binary --some-arg 5"
@@ -81,7 +79,7 @@ echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 Due to optimizations etc... sometimes the quality
 of the information presented in the flamegraph will
 suffer when profiling release builds. To counter this
-to some extent, you may set the following in your 
+to some extent, you may set the following in your
 `Cargo.toml` file:
 
 ```
