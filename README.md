@@ -1,6 +1,6 @@
 # cargo-flamegraph
 
-[![colorized flamegraph output](example.svg)](example.svg)
+[![colorized flamegraph output](example_cropped.png)](example.svg)
 
 A simple cargo plugin that generates a flamegraph
 for a given workload. It can be used to profile anything,
