@@ -1,12 +1,16 @@
 # cargo-flamegraph
 
+<p align="center">
+  <img alt="example flamegraph image" src="https://raw.githubusercontent.com/ferrous-systems/cargo-flamegraph/master/example.svg" width="20%" height="auto" />
+</p>
+
 A simple cargo plugin that generates a flamegraph
 for a given workload. It can be used to profile anything,
 not just Rust projects! No perl or pipes required <3
 
 Uses perf on linux and dtrace otherwise.
 
-Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D 
+Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
 ## Installation
 
