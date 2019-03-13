@@ -1,4 +1,4 @@
-# cargo-flamegraph
+# [cargo-]flamegraph
 
 [![colorized flamegraph output](example_cropped.png)](example.svg)
 
