@@ -12,6 +12,17 @@ Relies on perf on linux and dtrace otherwise.
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
+# Ferrous Systems
+
+This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems.com)
+to help their customers and workshop attendees develop high performance systems
+in the Rust programming language. If you would like to work with some of
+the world's most experienced Rust systems engineers, either to
+build systems together or to [increase your team's skills](https://ferrous-systems.com/rust-training/),
+get in touch :D
+
+[![Ferrous Systems](https://ferrous-systems.com/images/ferrous-logo-text.svg)](https://ferrous-systems.com/)
+
 ## Installation
 
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
@@ -273,13 +284,3 @@ is about the theoretical maximum gain that can be made for a workload by paralle
 is a deceptively simple law with some subtle implications from queue theory
 that allows us to reason about appropriate queue lengths for our systems
 
-# Ferrous Systems
-
-This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems.com)
-to help their customers and workshop attendees develop high performance systems
-in the Rust programming language. If you would like to work with some of
-the world's most experienced Rust systems engineers, either to
-build systems together or to [increase your team's skills](https://ferrous-systems.com/rust-training/),
-get in touch :D
-
-[![Ferrous Systems](https://ferrous-systems.com/images/ferrous-logo-text.svg)](https://ferrous-systems.com/)
