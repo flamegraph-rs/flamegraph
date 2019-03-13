@@ -1,6 +1,6 @@
 [package]
 name = "flamegraph"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Tyler Neely <tyler.neely@ferrous-systems.com>"]
 description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
 license = "MIT/Apache-2.0"
@@ -12,7 +12,11 @@ edition = "2018"
 
 [[bin]]
 name = "cargo-flamegraph"
-path = "src/main.rs"
+path = "src/bin/cargo-flamegraph.rs"
+
+[[bin]]
+name = "flamegraph"
+path = "src/bin/flamegraph.rs"
 
 [dependencies]
 inferno = "0.4"

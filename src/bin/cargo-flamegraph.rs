@@ -1,0 +1,225 @@
+use std::path::PathBuf;
+
+#[cfg(not(target_os = "linux"))]
+use inferno::collapse::dtrace::{
+    Folder, Options as CollapseOptions,
+};
+
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(raw(
+    setting = "structopt::clap::AppSettings::TrailingVarArg"
+))]
+struct Opt {
+    /// Build with the dev profile
+    #[structopt(long = "dev")]
+    dev: bool,
+
+    /// Binary to run
+    #[structopt(
+        short = "b",
+        long = "bin",
+        conflicts_with = "example"
+    )]
+    bin: Option<String>,
+
+    /// Example to run
+    #[structopt(long = "example", conflicts_with = "bin")]
+    example: Option<String>,
+
+    /// Output file, flamegraph.svg if not present
+    #[structopt(
+        parse(from_os_str),
+        short = "o",
+        long = "output"
+    )]
+    output: Option<PathBuf>,
+
+    /// Build features to enable
+    #[structopt(short = "f", long = "features")]
+    features: Option<String>,
+
+    trailing_arguments: Vec<String>,
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "cargo-flamegraph",
+    about = "A cargo subcommand for generating flamegraphs, using inferno"
+)]
+enum Opts {
+    #[structopt(name = "flamegraph")]
+    Flamegraph(Opt),
+}
+
+fn build(opt: &Opt) {
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("build");
+
+    if !opt.dev {
+        cmd.arg("--release");
+    }
+
+    if let Some(ref bin) = opt.bin {
+        cmd.arg("--bin");
+        cmd.arg(bin);
+    }
+
+    if let Some(ref example) = opt.example {
+        cmd.arg("--example");
+        cmd.arg(example);
+    }
+
+    if let Some(ref features) = opt.features {
+        cmd.arg("--features");
+        cmd.arg(features);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .expect("failed to spawn cargo build command");
+
+    let exit_status = child.wait().expect(
+        "failed to wait for cargo build child to finish",
+    );
+
+    if !opt.dev {
+        cmd.arg("--message-format=json");
+
+        let output: Vec<u8> = cmd
+            .output()
+            .expect("failed to execute cargo build command")
+            .stdout;
+
+        let messages =
+            cargo_metadata::parse_messages(&*output);
+
+        let mut has_debuginfo = false;
+
+        // This is an extremely coarse check to see
+        // if any of our build artifacts have debuginfo
+        // enabled.
+        for message in messages {
+            let artifact = if let Ok(
+                cargo_metadata::Message::CompilerArtifact(
+                    artifact,
+                ),
+            ) = message
+            {
+                artifact
+            } else {
+                continue;
+            };
+
+            if workload(opt).contains(&artifact.target.name)
+                && artifact.profile.debuginfo.unwrap_or(0)
+                    != 0
+            {
+                has_debuginfo = true;
+            }
+        }
+
+        if !has_debuginfo {
+            eprintln!(
+                "\nWARNING: building without debuginfo. \
+                 Enable symbol information by adding \
+                 the following lines to Cargo.toml:\n"
+            );
+            eprintln!("[profile.release]");
+            eprintln!("debug = true\n");
+        }
+    }
+
+    if !exit_status.success() {
+        eprintln!("cargo build failed: {:?}", child.stderr);
+        std::process::exit(1);
+    }
+}
+
+fn workload(opt: &Opt) -> String {
+    let mut metadata_cmd =
+        cargo_metadata::MetadataCommand::new();
+    metadata_cmd.no_deps();
+    let metadata = metadata_cmd
+        .exec()
+        .expect("could not access crate metadata");
+
+    let mut binary_path = metadata.target_directory;
+
+    if opt.dev {
+        binary_path.push("debug");
+    } else {
+        binary_path.push("release");
+    }
+
+    if opt.example.is_some() {
+        binary_path.push("examples");
+    }
+
+    let targets: Vec<String> = metadata
+        .packages
+        .into_iter()
+        .flat_map(|p| p.targets)
+        .filter(|t| t.crate_types.contains(&"bin".into()))
+        .map(|t| t.name)
+        .collect();
+
+    if targets.is_empty() {
+        eprintln!("no Rust binary targets found");
+        std::process::exit(1);
+    }
+
+    let explicit_bin =
+        opt.bin.as_ref().or(opt.example.as_ref());
+    let target: &String = if let Some(ref bin) =
+        explicit_bin
+    {
+        if targets.contains(&bin) {
+            bin
+        } else {
+            eprintln!(
+                "could not find desired target {} \
+                 in the targets for this crate: {:?}",
+                bin, targets
+            );
+            std::process::exit(1);
+        }
+    } else if targets.len() == 1 {
+        &targets[0]
+    } else {
+        eprintln!(
+            "several possible targets found: {:?}, \
+             please pass `--bin <binary>` or `--example <example>` \
+             to cargo flamegraph to choose one of them",
+            targets
+        );
+        std::process::exit(1);
+    };
+
+    binary_path.push(target);
+
+    format!(
+        "{} {}",
+        binary_path.to_string_lossy(),
+        opt.trailing_arguments.join(" ")
+    )
+}
+
+fn main() {
+    let Opts::Flamegraph(mut opt) = Opts::from_args();
+
+    build(&opt);
+
+    let workload = workload(&opt);
+
+    let flamegraph_filename: PathBuf = opt
+        .output
+        .take()
+        .unwrap_or("flamegraph.svg".into());
+
+    flamegraph::generate_flamegraph_by_running_command(
+        workload,
+        flamegraph_filename,
+    );
+}
