@@ -2,13 +2,13 @@
 
 [![colorized flamegraph output](example_cropped.png)](example.svg)
 
-A simple cargo plugin that generates a flamegraph
-for a given workload. It can be used to profile anything,
+A Rust-powered flamegraph generator with additional support for
+Cargo projects! It can be used to profile anything,
 not just Rust projects! No perl or pipes required <3
 
-Usage guide: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
+How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
-Uses perf on linux and dtrace otherwise.
+Relies on perf on linux and dtrace otherwise.
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
@@ -20,15 +20,19 @@ Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windo
 cargo install flamegraph
 ```
 
-This will make the `cargo-flamegraph` binary
-available in your cargo binary directory.
-On most systems this is usually something
-like `~/.cargo/bin`.
+This will make the `flamegraph` and 
+`cargo-flamegraph` binaries available in your cargo
+binary directory. On most systems this is 
+usually something like `~/.cargo/bin`.
 
 ## Examples
 
 ```
-# defaults to profiling cargo run
+# if you'd like to profile an arbitrary executable:
+flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
+
+# cargo support provided throuph the cargo-flamegraph binary!
+# defaults to profiling cargo run --release
 cargo flamegraph
 
 # by default, `--release` profile is used, 
@@ -40,12 +44,11 @@ cargo flamegraph --bin=stress2
 
 # if you want to pass arguments, as you would with cargo run:
 cargo flamegraph -- my-command --my-arg my-value -m -f
-
-# if you'd like to profile an arbitrary executable:
-cargo flamegraph --exec="/path/to/my/binary --some-arg 5"
 ```
 
 ## Usage
+
+`flamegraph` is quite simple. `cargo-flamegraph` is more sophisticated:
 
 ```
 USAGE:
@@ -58,7 +61,6 @@ FLAGS:
 
 OPTIONS:
     -b, --bin <bin>              Binary to run
-    -e, --exec <exec>            Other command to run
     -f, --features <features>    Build features to enable
     -o, --output <output>        Output file, flamegraph.svg if not present
 ```
