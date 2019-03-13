@@ -21,9 +21,9 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(raw(setting = "structopt::clap::AppSettings::TrailingVarArg"))]
 struct Opt {
-    /// Activate release mode
-    #[structopt(short = "r", long = "release")]
-    release: bool,
+    /// Build with the dev profile
+    #[structopt(long = "dev")]
+    dev: bool,
 
     /// Binary to run
     #[structopt(short = "b", long = "bin", conflicts_with = "example")]
@@ -148,7 +148,7 @@ fn build(opt: &Opt) {
     let mut cmd = std::process::Command::new("cargo");
     cmd.arg("build");
 
-    if opt.release {
+    if !opt.dev {
         cmd.arg("--release");
     }
 
@@ -169,9 +169,27 @@ fn build(opt: &Opt) {
 
     let mut child = cmd.spawn().expect("failed to spawn cargo build command");
 
-    let exit_status = child.wait().expect(
-        "failed to wait for cargo build child to finish",
-    );
+    let exit_status = child
+        .wait()
+        .expect("failed to wait for cargo build child to finish");
+
+    if !opt.dev {
+        let output = cmd.output().expect("failed to execute cargo build command");
+        if let Ok(stdout) = std::str::from_utf8(&output.stdout) {
+            if !stdout.contains("debuginfo") {
+                eprintln!(
+                    "\
+WARNING: building without debuginfo
+
+Enable symbol information by adding the following lines to Cargo.toml:
+
+[profile.release]
+debug = true
+"
+                )
+            }
+        }
+    }
 
     if !exit_status.success() {
         eprintln!("cargo build failed: {:?}", child.stderr);
@@ -192,10 +210,10 @@ fn workload(opt: &Opt) -> String {
 
     let mut binary_path = metadata.target_directory;
 
-    if opt.release {
-        binary_path.push("release");
-    } else {
+    if opt.dev {
         binary_path.push("debug");
+    } else {
+        binary_path.push("release");
     }
 
     if opt.example.is_some() {
