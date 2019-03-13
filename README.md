@@ -26,13 +26,12 @@ like `~/.cargo/bin`.
 ## Examples
 
 ```
-# defaults to profiling cargo run, which will
-# also profile the cargo compilation process
-# unless you've previously issued `cargo build`
+# defaults to profiling cargo run
 cargo flamegraph
 
-# if you'd like to profile your release build:
-cargo flamegraph --release
+# by default, `--release` profile is used, 
+# but you can override this:
+cargo flamegraph --dev
 
 # if you'd like to profile a specific binary:
 cargo flamegraph --bin=stress2
