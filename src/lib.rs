@@ -122,8 +122,6 @@ pub fn generate_flamegraph_by_running_command<
     workload: String,
     flamegraph_filename: P,
 ) {
-    eprintln!("{:?}", flamegraph_filename);
-
     // handle SIGINT by doing nothing
     unsafe {
         signal_hook::register(signal_hook::SIGINT, || { })
@@ -154,8 +152,6 @@ pub fn generate_flamegraph_by_running_command<
             std::process::exit(1);
         }
     }
-
-    eprintln!("perf exited, so now we wait: {:?}", flamegraph_filename);
 
     let output = arch::output();
 
