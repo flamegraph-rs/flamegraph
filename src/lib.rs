@@ -36,7 +36,9 @@ mod arch {
     ) -> Command {
         let mut command = Command::new("perf");
 
-        for arg in "record -F 99 -g".split_whitespace() {
+        for arg in "record -F 99 --call-graph dwarf -g"
+            .split_whitespace()
+        {
             command.arg(arg);
         }
 
