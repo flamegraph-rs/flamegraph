@@ -4,6 +4,9 @@ use std::{
     process::Command,
 };
 
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+
 #[cfg(target_os = "linux")]
 use inferno::collapse::perf::{
     Folder, Options as CollapseOptions,
@@ -20,6 +23,8 @@ use inferno::{
         from_reader, Options as FlamegraphOptions,
     },
 };
+
+use signal_hook;
 
 #[cfg(target_os = "linux")]
 mod arch {
@@ -117,17 +122,40 @@ pub fn generate_flamegraph_by_running_command<
     workload: String,
     flamegraph_filename: P,
 ) {
+    eprintln!("{:?}", flamegraph_filename);
+
+    // handle SIGINT by doing nothing
+    unsafe {
+        signal_hook::register(signal_hook::SIGINT, || { })
+            .expect("cannot register signal handler");
+    }
+
     let mut command = arch::initial_command(workload);
 
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);
-    let exit_status =
-        recorder.wait().expect(arch::WAIT_ERROR);
 
-    if !exit_status.success() {
-        eprintln!("failed to sample program");
-        std::process::exit(1);
+    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
+
+    // only stop if perf exited unsuccessfully, but was not killed by a signal (assuming that the
+    // latter case usually means the user interrupted it in some way)
+    #[cfg(unix)]
+    {
+        if !exit_status.success() && exit_status.signal().is_none() {
+            eprintln!("failed to sample program");
+            std::process::exit(1);
+        }
     }
+
+    #[cfg(not(unix))]
+    {
+        if !exit_status.success() {
+            eprintln!("failed to sample program");
+            std::process::exit(1);
+        }
+    }
+
+    eprintln!("perf exited, so now we wait: {:?}", flamegraph_filename);
 
     let output = arch::output();
 
