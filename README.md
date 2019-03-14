@@ -42,7 +42,7 @@ usually something like `~/.cargo/bin`.
 # if you'd like to profile an arbitrary executable:
 flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
 
-# cargo support provided throuph the cargo-flamegraph binary!
+# cargo support provided through the cargo-flamegraph binary!
 # defaults to profiling cargo run --release
 cargo flamegraph
 
