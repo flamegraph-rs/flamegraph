@@ -20,5 +20,6 @@ path = "src/bin/flamegraph.rs"
 
 [dependencies]
 inferno = "0.4"
+signal-hook = "0.1.8"
 structopt = "0.2.14"
 cargo_metadata = "0.7.1"
