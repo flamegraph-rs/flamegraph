@@ -78,7 +78,8 @@ mod arch {
     ) -> Command {
         let mut command = Command::new("dtrace");
 
-        let dtrace_script = "profile-997 /pid == $target/ { @[ustack(100)] = count(); }";
+        let dtrace_script = "profile-997 /pid == $target/ \
+                             { @[ustack(100)] = count(); }";
 
         command.arg("-x");
         command.arg("ustackframes=100");
@@ -98,7 +99,10 @@ mod arch {
     pub fn output() -> Vec<u8> {
         let mut buf = vec![];
         let mut f = File::open("cargo-flamegraph.stacks")
-            .expect("failed to open dtrace output file cargo-flamegraph.stacks");
+            .expect(
+                "failed to open dtrace output \
+                 file cargo-flamegraph.stacks",
+            );
 
         use std::io::Read;
         f.read_to_end(&mut buf).expect(
@@ -122,9 +126,14 @@ pub fn generate_flamegraph_by_running_command<
     workload: String,
     flamegraph_filename: P,
 ) {
-    // handle SIGINT by doing nothing
     unsafe {
-        signal_hook::register(signal_hook::SIGINT, || { })
+        // Handle SIGINT with an empty handler. This has
+        // the implicit effect of allowing the signal
+        // to reach the process under observation
+        // while we continue to generate our flamegraph.
+        // (ctrl+c will send the SIGINT signal to all
+        // processes in the foreground process group).
+        signal_hook::register(signal_hook::SIGINT, || {})
             .expect("cannot register signal handler");
     }
 
@@ -133,13 +142,18 @@ pub fn generate_flamegraph_by_running_command<
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);
 
-    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
+    let exit_status =
+        recorder.wait().expect(arch::WAIT_ERROR);
 
-    // only stop if perf exited unsuccessfully, but was not killed by a signal (assuming that the
-    // latter case usually means the user interrupted it in some way)
+    // only stop if perf exited unsuccessfully, but
+    // was not killed by a signal (assuming that the
+    // latter case usually means the user interrupted
+    // it in some way)
     #[cfg(unix)]
     {
-        if !exit_status.success() && exit_status.signal().is_none() {
+        if !exit_status.success()
+            && exit_status.signal().is_none()
+        {
             eprintln!("failed to sample program");
             std::process::exit(1);
         }
@@ -185,6 +199,13 @@ pub fn generate_flamegraph_by_running_command<
 
     let flamegraph_options = FlamegraphOptions::default();
 
-    from_reader(flamegraph_options, collapsed_reader, flamegraph_writer)
-        .expect("unable to generate a flamegraph from the collapsed stack data");
+    from_reader(
+        flamegraph_options,
+        collapsed_reader,
+        flamegraph_writer,
+    )
+    .expect(
+        "unable to generate a flamegraph \
+         from the collapsed stack data",
+    );
 }
