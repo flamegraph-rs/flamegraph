@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{BufReader, BufWriter},
-    process::Command,
+    process::{Command, ExitStatus},
 };
 
 #[cfg(unix)]
@@ -120,22 +120,36 @@ mod arch {
     }
 }
 
+#[cfg(unix)]
+fn terminated_by_error(status: ExitStatus) -> bool {
+    status
+        .signal() // the default needs to be true because that's the neutral element for `&&`
+        .map_or(true, |code| {
+            code != signal_hook::SIGINT && code != signal_hook::SIGTERM
+        }) && !status.success()
+}
+
+#[cfg(not(unix))]
+fn terminated_by_error(status: ExitStatus) -> bool {
+    !exit_status.success()
+}
+
 pub fn generate_flamegraph_by_running_command<
     P: AsRef<std::path::Path>,
 >(
     workload: String,
     flamegraph_filename: P,
 ) {
-    unsafe {
-        // Handle SIGINT with an empty handler. This has
-        // the implicit effect of allowing the signal
-        // to reach the process under observation
-        // while we continue to generate our flamegraph.
-        // (ctrl+c will send the SIGINT signal to all
-        // processes in the foreground process group).
-        signal_hook::register(signal_hook::SIGINT, || {})
-            .expect("cannot register signal handler");
-    }
+    // Handle SIGINT with an empty handler. This has the
+    // implicit effect of allowing the signal to reach the
+    // process under observation while we continue to
+    // generate our flamegraph.  (ctrl+c will send the
+    // SIGINT signal to all processes in the foreground
+    // process group).
+    let handler = unsafe {
+        signal_hook::register(signal_hook::SIGINT, || { })
+            .expect("cannot register signal handler")
+    };
 
     let mut command = arch::initial_command(workload);
 
@@ -145,26 +159,15 @@ pub fn generate_flamegraph_by_running_command<
     let exit_status =
         recorder.wait().expect(arch::WAIT_ERROR);
 
+    signal_hook::unregister(handler);
+
     // only stop if perf exited unsuccessfully, but
     // was not killed by a signal (assuming that the
     // latter case usually means the user interrupted
     // it in some way)
-    #[cfg(unix)]
-    {
-        if !exit_status.success()
-            && exit_status.signal().is_none()
-        {
-            eprintln!("failed to sample program");
-            std::process::exit(1);
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        if !exit_status.success() {
-            eprintln!("failed to sample program");
-            std::process::exit(1);
-        }
+    if terminated_by_error(exit_status) {
+        eprintln!("failed to sample program");
+        std::process::exit(1);
     }
 
     let output = arch::output();
