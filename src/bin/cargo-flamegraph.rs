@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 
 #[cfg(not(target_os = "linux"))]
@@ -20,13 +21,26 @@ struct Opt {
     #[structopt(
         short = "b",
         long = "bin",
-        conflicts_with = "example"
+        conflicts_with = "example",
+        conflicts_with = "test"
     )]
     bin: Option<String>,
 
     /// Example to run
-    #[structopt(long = "example", conflicts_with = "bin")]
+    #[structopt(
+        long = "example",
+        conflicts_with = "bin",
+        conflicts_with = "test"
+    )]
     example: Option<String>,
+
+    /// Test binary to run (currently profiles the test harness and all tests in the binary)
+    #[structopt(
+        long = "test",
+        conflicts_with = "bin",
+        conflicts_with = "example"
+    )]
+    test: Option<String>,
 
     /// Output file, flamegraph.svg if not present
     #[structopt(
@@ -69,6 +83,11 @@ fn build(opt: &Opt) {
     if let Some(ref example) = opt.example {
         cmd.arg("--example");
         cmd.arg(example);
+    }
+
+    if let Some(ref test) = opt.test {
+        cmd.arg("--test");
+        cmd.arg(test);
     }
 
     if let Some(ref features) = opt.features {
@@ -171,12 +190,40 @@ fn workload(opt: &Opt) -> String {
     }
 
     let explicit_bin =
-        opt.bin.as_ref().or(opt.example.as_ref());
-    let target: &String = if let Some(ref bin) =
+        opt.bin.as_ref().or(opt.test.as_ref()).or(opt.example.as_ref());
+    let target: String = if let Some(ref bin) =
         explicit_bin
     {
-        if targets.contains(&bin) {
-            bin
+        if opt.test.is_some() {
+            // Ignorance-based error handling. We really do not care about any errors
+            // popping up from the filesystem search here. Thus, we just bash them into
+            // place using `Option`s monadic properties. Not pretty though.
+            fs::read_dir(&binary_path)
+                .ok()
+                .and_then(|mut r| {
+                    r.find(|f| if let Ok(f) = f {
+                        let file_name = f.file_name();
+                        let name = file_name.to_string_lossy();
+                        name.starts_with(bin as &str) && !name.ends_with(".d")
+                    } else {
+                        false
+                    })
+                    .and_then(|r| r.ok())
+                })
+                .and_then(|f|
+                    f.path()
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string()))
+                .unwrap_or_else(|| {
+                    eprintln!(
+                        "could not find desired target {} \
+                         in the targets for this crate: {:?}",
+                        bin, targets
+                    );
+                    std::process::exit(1);
+                })
+        } else if targets.contains(&bin) {
+            bin.to_string()
         } else {
             eprintln!(
                 "could not find desired target {} \
@@ -186,7 +233,7 @@ fn workload(opt: &Opt) -> String {
             std::process::exit(1);
         }
     } else if targets.len() == 1 {
-        &targets[0]
+        targets[0].to_owned()
     } else {
         eprintln!(
             "several possible targets found: {:?}, \
