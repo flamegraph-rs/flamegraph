@@ -8,7 +8,9 @@ not just Rust projects! No perl or pipes required <3
 
 How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
-Relies on perf on linux and dtrace otherwise.
+Relies on perf on linux and dtrace otherwise. Built on top of the
+wonderful [inferno](https://github.com/jonhoo/inferno) all-rust
+flamegraph generation library!
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
