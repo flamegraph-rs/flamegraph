@@ -165,7 +165,7 @@ dependencies = [
 
 [[package]]
 name = "flamegraph"
-version = "0.1.11"
+version = "0.1.13"
 dependencies = [
  "cargo_metadata 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "inferno 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
