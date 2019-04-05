@@ -25,6 +25,10 @@ struct Opt {
     #[structopt(short = "p", long = "pid")]
     pid: Option<u32>,
 
+    /// Sampling frequency
+    #[structopt(short = "F", long = "freq")]
+    frequency: Option<u32>,
+
     trailing_arguments: Vec<String>,
 }
 
@@ -65,5 +69,6 @@ fn main() {
         workload,
         flamegraph_filename,
         opt.root,
+        opt.frequency,
     );
 }

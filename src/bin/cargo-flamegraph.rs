@@ -67,6 +67,10 @@ struct Opt {
     #[structopt(long = "root")]
     root: bool,
 
+    /// Sampling frequency
+    #[structopt(short = "F", long = "freq")]
+    frequency: Option<u32>,
+
     trailing_arguments: Vec<String>,
 }
 
@@ -297,5 +301,6 @@ fn main() {
         Workload::Command(workload),
         &flamegraph_filename,
         opt.root,
+        opt.frequency,
     );
 }
