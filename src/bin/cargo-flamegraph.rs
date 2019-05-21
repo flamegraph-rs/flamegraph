@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
@@ -151,6 +151,36 @@ fn build(opt: &Opt) {
     }
 }
 
+fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
+    // Ignorance-based error handling. We really do not care about any errors
+    // popping up from the filesystem search here. Thus, we just bash them into
+    // place using `Option`s monadic properties. Not pretty though.
+    fs::read_dir(path)
+        .ok()
+        .and_then(|mut r| {
+            r.find(|f| if let Ok(f) = f {
+                let file_name = f.file_name();
+                let name = file_name.to_string_lossy();
+                name.starts_with(bin) && !name.ends_with(".d")
+            } else {
+                false
+            })
+            .and_then(|r| r.ok())
+        })
+        .and_then(|f|
+            f.path()
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| {
+            eprintln!(
+                "could not find desired target {} \
+                 in the {} targets for this crate",
+                bin, ty
+            );
+            std::process::exit(1);
+        })
+}
+
 fn workload(opt: &Opt) -> String {
     let mut metadata_cmd =
         cargo_metadata::MetadataCommand::new();
@@ -184,40 +214,10 @@ fn workload(opt: &Opt) -> String {
         std::process::exit(1);
     }
 
-    let explicit_bin =
-        opt.bin.as_ref().or(opt.test.as_ref()).or(opt.example.as_ref());
-    let target: String = if let Some(ref bin) =
-        explicit_bin
-    {
-        if opt.test.is_some() {
-            // Ignorance-based error handling. We really do not care about any errors
-            // popping up from the filesystem search here. Thus, we just bash them into
-            // place using `Option`s monadic properties. Not pretty though.
-            fs::read_dir(&binary_path)
-                .ok()
-                .and_then(|mut r| {
-                    r.find(|f| if let Ok(f) = f {
-                        let file_name = f.file_name();
-                        let name = file_name.to_string_lossy();
-                        name.starts_with(bin as &str) && !name.ends_with(".d")
-                    } else {
-                        false
-                    })
-                    .and_then(|r| r.ok())
-                })
-                .and_then(|f|
-                    f.path()
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string()))
-                .unwrap_or_else(|| {
-                    eprintln!(
-                        "could not find desired target {} \
-                         in the targets for this crate: {:?}",
-                        bin, targets
-                    );
-                    std::process::exit(1);
-                })
-        } else if targets.contains(&bin) {
+    let target = if let Some(ref test) = opt.test {
+        find_binary("test", &binary_path, test)
+    } else if let Some(ref bin) = opt.bin.as_ref().or(opt.example.as_ref()) {
+        if targets.contains(&bin) {
             bin.to_string()
         } else {
             eprintln!(
