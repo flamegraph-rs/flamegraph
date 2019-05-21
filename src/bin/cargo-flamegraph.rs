@@ -16,6 +16,7 @@ struct Opt {
     #[structopt(
         short = "b",
         long = "bin",
+        conflicts_with = "bench",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -24,6 +25,7 @@ struct Opt {
     /// Example to run
     #[structopt(
         long = "example",
+        conflicts_with = "bench",
         conflicts_with = "bin",
         conflicts_with = "test"
     )]
@@ -32,10 +34,20 @@ struct Opt {
     /// Test binary to run (currently profiles the test harness and all tests in the binary)
     #[structopt(
         long = "test",
+        conflicts_with = "bench",
         conflicts_with = "bin",
         conflicts_with = "example"
     )]
     test: Option<String>,
+
+    /// Benchmark to run
+    #[structopt(
+        long = "bench",
+        conflicts_with = "bin",
+        conflicts_with = "example",
+        conflicts_with = "test"
+    )]
+    bench: Option<String>,
 
     /// Output file, flamegraph.svg if not present
     #[structopt(
@@ -83,6 +95,11 @@ fn build(opt: &Opt) {
     if let Some(ref test) = opt.test {
         cmd.arg("--test");
         cmd.arg(test);
+    }
+
+    if let Some(ref bench) = opt.bench {
+        cmd.arg("--bench");
+        cmd.arg(bench);
     }
 
     if let Some(ref features) = opt.features {
@@ -135,12 +152,16 @@ fn build(opt: &Opt) {
         }
 
         if !has_debuginfo {
+            let mut profile = "release";
+            if opt.bench.is_some() {
+                profile = "bench";
+            }
             eprintln!(
                 "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
                  the following lines to Cargo.toml:\n"
             );
-            eprintln!("[profile.release]");
+            eprintln!("[profile.{}]", profile);
             eprintln!("debug = true\n");
         }
     }
@@ -216,6 +237,8 @@ fn workload(opt: &Opt) -> String {
 
     let target = if let Some(ref test) = opt.test {
         find_binary("test", &binary_path, test)
+    } else if let Some(ref bench) = opt.bench {
+        find_binary("bench", &binary_path, bench)
     } else if let Some(ref bin) = opt.bin.as_ref().or(opt.example.as_ref()) {
         if targets.contains(&bin) {
             bin.to_string()
