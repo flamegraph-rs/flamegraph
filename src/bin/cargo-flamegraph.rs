@@ -1,11 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
 
-#[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{
-    Folder, Options as CollapseOptions,
-};
-
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
