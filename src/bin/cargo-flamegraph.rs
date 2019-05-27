@@ -1,10 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
-
-#[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{
-    Folder, Options as CollapseOptions,
-};
+use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
@@ -21,6 +16,7 @@ struct Opt {
     #[structopt(
         short = "b",
         long = "bin",
+        conflicts_with = "bench",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -29,6 +25,7 @@ struct Opt {
     /// Example to run
     #[structopt(
         long = "example",
+        conflicts_with = "bench",
         conflicts_with = "bin",
         conflicts_with = "test"
     )]
@@ -37,10 +34,20 @@ struct Opt {
     /// Test binary to run (currently profiles the test harness and all tests in the binary)
     #[structopt(
         long = "test",
+        conflicts_with = "bench",
         conflicts_with = "bin",
         conflicts_with = "example"
     )]
     test: Option<String>,
+
+    /// Benchmark to run
+    #[structopt(
+        long = "bench",
+        conflicts_with = "bin",
+        conflicts_with = "example",
+        conflicts_with = "test"
+    )]
+    bench: Option<String>,
 
     /// Output file, flamegraph.svg if not present
     #[structopt(
@@ -88,6 +95,11 @@ fn build(opt: &Opt) {
     if let Some(ref test) = opt.test {
         cmd.arg("--test");
         cmd.arg(test);
+    }
+
+    if let Some(ref bench) = opt.bench {
+        cmd.arg("--bench");
+        cmd.arg(bench);
     }
 
     if let Some(ref features) = opt.features {
@@ -140,12 +152,16 @@ fn build(opt: &Opt) {
         }
 
         if !has_debuginfo {
+            let mut profile = "release";
+            if opt.bench.is_some() {
+                profile = "bench";
+            }
             eprintln!(
                 "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
                  the following lines to Cargo.toml:\n"
             );
-            eprintln!("[profile.release]");
+            eprintln!("[profile.{}]", profile);
             eprintln!("debug = true\n");
         }
     }
@@ -154,6 +170,36 @@ fn build(opt: &Opt) {
         eprintln!("cargo build failed: {:?}", child.stderr);
         std::process::exit(1);
     }
+}
+
+fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
+    // Ignorance-based error handling. We really do not care about any errors
+    // popping up from the filesystem search here. Thus, we just bash them into
+    // place using `Option`s monadic properties. Not pretty though.
+    fs::read_dir(path)
+        .ok()
+        .and_then(|mut r| {
+            r.find(|f| if let Ok(f) = f {
+                let file_name = f.file_name();
+                let name = file_name.to_string_lossy();
+                name.starts_with(bin) && !name.ends_with(".d")
+            } else {
+                false
+            })
+            .and_then(|r| r.ok())
+        })
+        .and_then(|f|
+            f.path()
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| {
+            eprintln!(
+                "could not find desired target {} \
+                 in the {} targets for this crate",
+                bin, ty
+            );
+            std::process::exit(1);
+        })
 }
 
 fn workload(opt: &Opt) -> String {
@@ -189,40 +235,12 @@ fn workload(opt: &Opt) -> String {
         std::process::exit(1);
     }
 
-    let explicit_bin =
-        opt.bin.as_ref().or(opt.test.as_ref()).or(opt.example.as_ref());
-    let target: String = if let Some(ref bin) =
-        explicit_bin
-    {
-        if opt.test.is_some() {
-            // Ignorance-based error handling. We really do not care about any errors
-            // popping up from the filesystem search here. Thus, we just bash them into
-            // place using `Option`s monadic properties. Not pretty though.
-            fs::read_dir(&binary_path)
-                .ok()
-                .and_then(|mut r| {
-                    r.find(|f| if let Ok(f) = f {
-                        let file_name = f.file_name();
-                        let name = file_name.to_string_lossy();
-                        name.starts_with(bin as &str) && !name.ends_with(".d")
-                    } else {
-                        false
-                    })
-                    .and_then(|r| r.ok())
-                })
-                .and_then(|f|
-                    f.path()
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string()))
-                .unwrap_or_else(|| {
-                    eprintln!(
-                        "could not find desired target {} \
-                         in the targets for this crate: {:?}",
-                        bin, targets
-                    );
-                    std::process::exit(1);
-                })
-        } else if targets.contains(&bin) {
+    let target = if let Some(ref test) = opt.test {
+        find_binary("test", &binary_path, test)
+    } else if let Some(ref bench) = opt.bench {
+        find_binary("bench", &binary_path, bench)
+    } else if let Some(ref bin) = opt.bin.as_ref().or(opt.example.as_ref()) {
+        if targets.contains(&bin) {
             bin.to_string()
         } else {
             eprintln!(
