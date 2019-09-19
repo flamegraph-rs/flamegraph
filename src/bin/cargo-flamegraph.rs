@@ -179,19 +179,23 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
     fs::read_dir(path)
         .ok()
         .and_then(|mut r| {
-            r.find(|f| if let Ok(f) = f {
-                let file_name = f.file_name();
-                let name = file_name.to_string_lossy();
-                name.starts_with(bin) && !name.ends_with(".d")
-            } else {
-                false
+            r.find(|f| {
+                if let Ok(f) = f {
+                    let file_name = f.file_name();
+                    let name = file_name.to_string_lossy();
+                    name.starts_with(bin)
+                        && !name.ends_with(".d")
+                } else {
+                    false
+                }
             })
             .and_then(|r| r.ok())
         })
-        .and_then(|f|
+        .and_then(|f| {
             f.path()
                 .file_name()
-                .map(|n| n.to_string_lossy().to_string()))
+                .map(|n| n.to_string_lossy().to_string())
+        })
         .unwrap_or_else(|| {
             eprintln!(
                 "could not find desired target {} \
@@ -239,7 +243,9 @@ fn workload(opt: &Opt) -> String {
         find_binary("test", &binary_path, test)
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
-    } else if let Some(ref bin) = opt.bin.as_ref().or(opt.example.as_ref()) {
+    } else if let Some(ref bin) =
+        opt.bin.as_ref().or(opt.example.as_ref())
+    {
         if targets.contains(&bin) {
             bin.to_string()
         } else {

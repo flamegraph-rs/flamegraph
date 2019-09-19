@@ -125,8 +125,10 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     status
         .signal() // the default needs to be true because that's the neutral element for `&&`
         .map_or(true, |code| {
-            code != signal_hook::SIGINT && code != signal_hook::SIGTERM
-        }) && !status.success()
+            code != signal_hook::SIGINT
+                && code != signal_hook::SIGTERM
+        })
+        && !status.success()
 }
 
 #[cfg(not(unix))]
@@ -147,7 +149,7 @@ pub fn generate_flamegraph_by_running_command<
     // SIGINT signal to all processes in the foreground
     // process group).
     let handler = unsafe {
-        signal_hook::register(signal_hook::SIGINT, || { })
+        signal_hook::register(signal_hook::SIGINT, || {})
             .expect("cannot register signal handler")
     };
 
