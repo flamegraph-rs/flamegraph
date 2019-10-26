@@ -40,14 +40,13 @@ fn main() {
         .output
         .take()
         .unwrap_or("flamegraph.svg".into());
-    let should_open = opt.open;
 
     flamegraph::generate_flamegraph_by_running_command(
         workload,
         flamegraph_filename.clone(),
     );
 
-    if should_open && flamegraph_filename.exists() {
+    if opt.open {
         if let Err(e) = opener::open(&flamegraph_filename) {
             eprintln!(
                 "Failed to open [{}]. Error: {:?}",
