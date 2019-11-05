@@ -28,6 +28,11 @@ get in touch :D
 
 ## Installation
 
+Requirements on Linux (Ubuntu/Debian):
+```
+sudo apt install -y perf linux-tools-generic`
+```
+
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
 
 ```
