@@ -206,7 +206,7 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
         })
 }
 
-fn workload(opt: &Opt) -> String {
+fn workload(opt: &Opt) -> Vec<String> {
     let mut metadata_cmd =
         cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
@@ -268,11 +268,9 @@ fn workload(opt: &Opt) -> String {
 
     binary_path.push(target);
 
-    format!(
-        "{} {}",
-        binary_path.to_string_lossy(),
-        opt.trailing_arguments.join(" ")
-    )
+    let mut result = opt.trailing_arguments.clone();
+    result.insert(0, binary_path.to_string_lossy().into());
+    result
 }
 
 fn main() {

@@ -22,13 +22,13 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
-fn workload(opt: &Opt) -> String {
+fn workload(opt: &Opt) -> Vec<String> {
     if opt.trailing_arguments.is_empty() {
         eprintln!("no workload given to generate a flamegraph for!");
         std::process::exit(1);
     }
 
-    opt.trailing_arguments.join(" ")
+    opt.trailing_arguments.clone()
 }
 
 fn main() {
