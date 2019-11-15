@@ -8,7 +8,7 @@ not just Rust projects! No perl or pipes required <3
 
 How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
-Relies on perf on linux and dtrace otherwise. Built on top of 
+Relies on perf on linux and dtrace otherwise. Built on top of
 [@jonhoo's](https://github.com/jonhoo)
 wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust
 flamegraph generation library!
@@ -28,15 +28,20 @@ get in touch :D
 
 ## Installation
 
+Requirements on Linux (Ubuntu/Debian):
+```
+sudo apt install -y linux-tools-common linux-tools-generic
+```
+
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
 
 ```
 cargo install flamegraph
 ```
 
-This will make the `flamegraph` and 
+This will make the `flamegraph` and
 `cargo-flamegraph` binaries available in your cargo
-binary directory. On most systems this is 
+binary directory. On most systems this is
 usually something like `~/.cargo/bin`.
 
 ## Examples
@@ -49,7 +54,7 @@ flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
 # defaults to profiling cargo run --release
 cargo flamegraph
 
-# by default, `--release` profile is used, 
+# by default, `--release` profile is used,
 # but you can override this:
 cargo flamegraph --dev
 
@@ -292,4 +297,3 @@ is about the theoretical maximum gain that can be made for a workload by paralle
 * [Little's Law](https://en.wikipedia.org/wiki/Little%27s_law)
 is a deceptively simple law with some subtle implications from queue theory
 that allows us to reason about appropriate queue lengths for our systems
-
