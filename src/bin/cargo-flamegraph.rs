@@ -61,6 +61,10 @@ struct Opt {
     #[structopt(short = "f", long = "features")]
     features: Option<String>,
 
+    /// Run with root privileges (using `sudo`)
+    #[structopt(long = "root")]
+    root: bool,
+
     trailing_arguments: Vec<String>,
 }
 
@@ -285,6 +289,7 @@ fn main() {
 
     flamegraph::generate_flamegraph_by_running_command(
         workload,
-        flamegraph_filename,
+        &flamegraph_filename,
+        opt.root,
     );
 }
