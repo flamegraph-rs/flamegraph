@@ -37,7 +37,7 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: String,
+        workload: Vec<String>,
         sudo: bool,
     ) -> Command {
         let mut command = if sudo {
@@ -54,9 +54,7 @@ mod arch {
             command.arg(arg);
         }
 
-        for item in workload.split_whitespace() {
-            command.arg(item);
-        }
+        command.args(&workload);
 
         command
     }
@@ -81,7 +79,7 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: String,
+        workload: Vec<String>,
         sudo: bool,
     ) -> Command {
         let mut command = if sudo {
@@ -105,7 +103,7 @@ mod arch {
         command.arg("cargo-flamegraph.stacks");
 
         command.arg("-c");
-        command.arg(&workload);
+        command.args(&workload);
 
         command
     }
@@ -151,7 +149,7 @@ fn terminated_by_error(status: ExitStatus) -> bool {
 pub fn generate_flamegraph_by_running_command<
     P: AsRef<std::path::Path>,
 >(
-    workload: String,
+    workload: Vec<String>,
     flamegraph_filename: P,
     sudo: bool,
 ) {
