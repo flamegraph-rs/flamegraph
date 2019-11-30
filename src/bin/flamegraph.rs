@@ -34,6 +34,11 @@ struct Opt {
 fn workload(opt: &Opt) -> Workload {
     match opt.pid {
         Some(p) => {
+            if !opt.trailing_arguments.is_empty() {
+                eprintln!("only a pid or command can be specified!");
+                std::process::exit(1);
+            }
+
             Workload::Pid(p)
         },
         None => {
