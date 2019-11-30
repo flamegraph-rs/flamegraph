@@ -118,7 +118,7 @@ mod arch {
         match workload {
             Workload::Command(c) => {
                 command.arg("-c");
-                command.args(&workload);
+                command.args(&c);
             },
             Workload::Pid(p) => {
                 command.arg("-p");
