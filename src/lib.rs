@@ -26,6 +26,11 @@ use inferno::{
 
 use signal_hook;
 
+pub enum Workload {
+    Command(Vec<String>),
+    Pid(u32),
+}
+
 #[cfg(target_os = "linux")]
 mod arch {
     use super::*;
@@ -37,7 +42,7 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: Vec<String>,
+        workload: Workload,
         sudo: bool,
     ) -> Command {
         let mut command = if sudo {
@@ -54,7 +59,15 @@ mod arch {
             command.arg(arg);
         }
 
-        command.args(&workload);
+        match workload {
+            Workload::Command(c) => {
+                command.args(&c);
+            },
+            Workload::Pid(p) => {
+                command.arg("-p");
+                command.arg(p.to_string());
+            },
+        }
 
         command
     }
@@ -79,7 +92,7 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: Vec<String>,
+        workload: Workload,
         sudo: bool,
     ) -> Command {
         let mut command = if sudo {
@@ -102,8 +115,16 @@ mod arch {
         command.arg("-o");
         command.arg("cargo-flamegraph.stacks");
 
-        command.arg("-c");
-        command.args(&workload);
+        match workload {
+            Workload::Command(c) => {
+                command.arg("-c");
+                command.args(&workload);
+            },
+            Workload::Pid(p) => {
+                command.arg("-p");
+                command.arg(p.to_string());
+            },
+        }
 
         command
     }
@@ -146,10 +167,10 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     !exit_status.success()
 }
 
-pub fn generate_flamegraph_by_running_command<
+pub fn generate_flamegraph_for_workload<
     P: AsRef<std::path::Path>,
 >(
-    workload: Vec<String>,
+    workload: Workload,
     flamegraph_filename: P,
     sudo: bool,
 ) {

@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
+use flamegraph::Workload;
+
 #[derive(Debug, StructOpt)]
 #[structopt(raw(
     setting = "structopt::clap::AppSettings::TrailingVarArg"
@@ -22,13 +24,13 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
-fn workload(opt: &Opt) -> Vec<String> {
+fn workload(opt: &Opt) -> Workload {
     if opt.trailing_arguments.is_empty() {
         eprintln!("no workload given to generate a flamegraph for!");
         std::process::exit(1);
     }
 
-    opt.trailing_arguments.clone()
+    Workload::Command(opt.trailing_arguments.clone())
 }
 
 fn main() {
@@ -41,7 +43,7 @@ fn main() {
         .take()
         .unwrap_or("flamegraph.svg".into());
 
-    flamegraph::generate_flamegraph_by_running_command(
+    flamegraph::generate_flamegraph_for_workload(
         workload,
         flamegraph_filename,
         opt.root,
