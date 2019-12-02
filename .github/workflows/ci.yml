@@ -15,6 +15,12 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build
       run: cargo build --verbose
+  build-macos:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build
+      run: cargo build --verbose
   build-windows:
     runs-on: windows-latest
     steps:
