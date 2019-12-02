@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
+use flamegraph::Workload;
+
 #[derive(Debug, StructOpt)]
 #[structopt(raw(
     setting = "structopt::clap::AppSettings::TrailingVarArg"
@@ -285,8 +287,8 @@ fn main() {
         .take()
         .unwrap_or("flamegraph.svg".into());
 
-    flamegraph::generate_flamegraph_by_running_command(
-        workload,
+    flamegraph::generate_flamegraph_for_workload(
+        Workload::Command(workload),
         &flamegraph_filename,
         opt.root,
     );
