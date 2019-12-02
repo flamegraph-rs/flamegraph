@@ -22,10 +22,7 @@ struct Opt {
     root: bool,
 
     /// Profile a running process by pid
-    #[structopt(
-        short = "p",
-        long = "pid"
-    )]
+    #[structopt(short = "p", long = "pid")]
     pid: Option<u32>,
 
     trailing_arguments: Vec<String>,
@@ -40,14 +37,16 @@ fn workload(opt: &Opt) -> Workload {
             }
 
             Workload::Pid(p)
-        },
+        }
         None => {
             if opt.trailing_arguments.is_empty() {
                 eprintln!("no workload given to generate a flamegraph for!");
                 std::process::exit(1);
             }
 
-            Workload::Command(opt.trailing_arguments.clone())
+            Workload::Command(
+                opt.trailing_arguments.clone(),
+            )
         }
     }
 }
