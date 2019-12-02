@@ -1,6 +1,8 @@
 name: Auto-Assign reviewers
 
-on: [pull_request]
+on:
+  pull_request:
+    types: created
 
 jobs:
   assign:
