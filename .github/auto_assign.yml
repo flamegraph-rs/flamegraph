@@ -1,6 +1,0 @@
-addAssignees: true
-numberOfAssignees: 1
-assignees:
-  - jonas-schievink
-  - matklad
-  - skade
