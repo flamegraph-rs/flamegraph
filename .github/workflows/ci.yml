@@ -11,6 +11,8 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "--deny warnings"
     steps:
     - uses: actions/checkout@v1
     - uses: actions-rs/toolchain@v1
@@ -22,6 +24,8 @@ jobs:
       run: cargo build --verbose
   build-macos:
     runs-on: macOS-latest
+    env:
+      RUSTFLAGS: "--deny warnings"
     steps:
     - uses: actions/checkout@v1
     - uses: actions-rs/toolchain@v1
@@ -33,6 +37,8 @@ jobs:
       run: cargo build --verbose
   build-windows:
     runs-on: windows-latest
+    env:
+      RUSTFLAGS: "--deny warnings"
     steps:
     - uses: actions/checkout@v1
     - uses: actions-rs/toolchain@v1
@@ -42,3 +48,20 @@ jobs:
         override: true
     - name: Build
       run: cargo build --verbose
+
+  lint:
+    runs-on: ubuntu-latest
+    - uses: actions/checkout@v1
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+        components: [rustfmt, clippy]
+    - name: Check code formatting
+      run: cargo fmt -- --check
+    - name: Run Clippy
+      uses: actions-rs/clippy-check@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        args: --all-features
