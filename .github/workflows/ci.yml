@@ -9,34 +9,14 @@ on:
     - master
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "--deny warnings"
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-    - name: Build
-      run: cargo build --verbose
-  build-macos:
-    runs-on: macOS-latest
-    env:
-      RUSTFLAGS: "--deny warnings"
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-    - name: Build
-      run: cargo build --verbose
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     env:
       RUSTFLAGS: "--deny warnings"
     steps:
