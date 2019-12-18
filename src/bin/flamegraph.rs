@@ -16,7 +16,7 @@ struct Opt {
     output: Option<PathBuf>,
 
     /// Open the output .svg file with default program
-    #[structopt(short = "O", long = "open")]
+    #[structopt(long = "open")]
     open: bool,
 
     trailing_arguments: Vec<String>,
