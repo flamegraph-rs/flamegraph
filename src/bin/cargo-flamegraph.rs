@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
+use flamegraph::Workload;
+
 #[derive(Debug, StructOpt)]
 #[structopt(raw(
     setting = "structopt::clap::AppSettings::TrailingVarArg"
@@ -64,6 +66,14 @@ struct Opt {
     /// Open the output .svg file with default program
     #[structopt(long = "open")]
     open: bool,
+    
+    /// Run with root privileges (using `sudo`)
+    #[structopt(long = "root")]
+    root: bool,
+
+    /// Sampling frequency
+    #[structopt(short = "F", long = "freq")]
+    frequency: Option<u32>,
 
     trailing_arguments: Vec<String>,
 }
@@ -183,19 +193,23 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
     fs::read_dir(path)
         .ok()
         .and_then(|mut r| {
-            r.find(|f| if let Ok(f) = f {
-                let file_name = f.file_name();
-                let name = file_name.to_string_lossy();
-                name.starts_with(bin) && !name.ends_with(".d")
-            } else {
-                false
+            r.find(|f| {
+                if let Ok(f) = f {
+                    let file_name = f.file_name();
+                    let name = file_name.to_string_lossy();
+                    name.starts_with(bin)
+                        && !name.ends_with(".d")
+                } else {
+                    false
+                }
             })
             .and_then(|r| r.ok())
         })
-        .and_then(|f|
+        .and_then(|f| {
             f.path()
                 .file_name()
-                .map(|n| n.to_string_lossy().to_string()))
+                .map(|n| n.to_string_lossy().to_string())
+        })
         .unwrap_or_else(|| {
             eprintln!(
                 "could not find desired target {} \
@@ -206,7 +220,7 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
         })
 }
 
-fn workload(opt: &Opt) -> String {
+fn workload(opt: &Opt) -> Vec<String> {
     let mut metadata_cmd =
         cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
@@ -243,7 +257,9 @@ fn workload(opt: &Opt) -> String {
         find_binary("test", &binary_path, test)
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
-    } else if let Some(ref bin) = opt.bin.as_ref().or(opt.example.as_ref()) {
+    } else if let Some(ref bin) =
+        opt.bin.as_ref().or(opt.example.as_ref())
+    {
         if targets.contains(&bin) {
             bin.to_string()
         } else {
@@ -268,11 +284,9 @@ fn workload(opt: &Opt) -> String {
 
     binary_path.push(target);
 
-    format!(
-        "{} {}",
-        binary_path.to_string_lossy(),
-        opt.trailing_arguments.join(" ")
-    )
+    let mut result = opt.trailing_arguments.clone();
+    result.insert(0, binary_path.to_string_lossy().into());
+    result
 }
 
 fn main() {
@@ -287,9 +301,11 @@ fn main() {
         .take()
         .unwrap_or("flamegraph.svg".into());
 
-    flamegraph::generate_flamegraph_by_running_command(
-        workload,
-        flamegraph_filename.clone(),
+    flamegraph::generate_flamegraph_for_workload(
+        Workload::Command(workload),
+        &flamegraph_filename.clone(),
+        opt.root,
+        opt.frequency,
     );
 
     if opt.open {
