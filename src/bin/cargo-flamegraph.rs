@@ -63,6 +63,10 @@ struct Opt {
     #[structopt(short = "f", long = "features")]
     features: Option<String>,
 
+    /// Open the output .svg file with default program
+    #[structopt(long = "open")]
+    open: bool,
+
     /// Run with root privileges (using `sudo`)
     #[structopt(long = "root")]
     root: bool,
@@ -303,4 +307,14 @@ fn main() {
         opt.root,
         opt.frequency,
     );
+
+    if opt.open {
+        if let Err(e) = opener::open(&flamegraph_filename) {
+            eprintln!(
+                "Failed to open [{}]. Error: {}",
+                flamegraph_filename.display(),
+                e
+            );
+        }
+    }
 }

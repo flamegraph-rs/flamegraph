@@ -22,6 +22,8 @@ path = "src/bin/flamegraph.rs"
 inferno = "0.4"
 structopt = "0.2.14"
 cargo_metadata = "0.7.1"
+opener = "0.4.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.1.8"
+
