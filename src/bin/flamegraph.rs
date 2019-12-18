@@ -79,7 +79,7 @@ fn main() {
     if opt.open {
         if let Err(e) = opener::open(&flamegraph_filename) {
             eprintln!(
-                "Failed to open [{}]. Error: {:?}",
+                "Failed to open [{}]. Error: {}",
                 flamegraph_filename.display(),
                 e
             );
