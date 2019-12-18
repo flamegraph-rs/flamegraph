@@ -24,7 +24,13 @@ use inferno::{
     },
 };
 
+#[cfg(unix)]
 use signal_hook;
+
+pub enum Workload {
+    Command(Vec<String>),
+    Pid(u32),
+}
 
 #[cfg(target_os = "linux")]
 mod arch {
@@ -37,18 +43,35 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: String,
+        workload: Workload,
+        sudo: bool,
+        freq: Option<u32>,
     ) -> Command {
-        let mut command = Command::new("perf");
+        let mut command = if sudo {
+            let mut c = Command::new("sudo");
+            c.arg("perf");
+            c
+        } else {
+            Command::new("perf")
+        };
 
-        for arg in "record -F 99 --call-graph dwarf -g"
-            .split_whitespace()
-        {
+        let args = format!(
+            "record -F {} --call-graph dwarf -g",
+            freq.unwrap_or(99)
+        );
+
+        for arg in args.split_whitespace() {
             command.arg(arg);
         }
 
-        for item in workload.split_whitespace() {
-            command.arg(item);
+        match workload {
+            Workload::Command(c) => {
+                command.args(&c);
+            }
+            Workload::Pid(p) => {
+                command.arg("-p");
+                command.arg(p.to_string());
+            }
         }
 
         command
@@ -74,12 +97,23 @@ mod arch {
          child command to exit";
 
     pub(crate) fn initial_command(
-        workload: String,
+        workload: Workload,
+        sudo: bool,
+        freq: Option<u32>,
     ) -> Command {
-        let mut command = Command::new("dtrace");
+        let mut command = if sudo {
+            let mut c = Command::new("sudo");
+            c.arg("dtrace");
+            c
+        } else {
+            Command::new("dtrace")
+        };
 
-        let dtrace_script = "profile-997 /pid == $target/ \
-                             { @[ustack(100)] = count(); }";
+        let dtrace_script = format!(
+            "profile-{} /pid == $target/ \
+             {{ @[ustack(100)] = count(); }}",
+            freq.unwrap_or(997)
+        );
 
         command.arg("-x");
         command.arg("ustackframes=100");
@@ -90,8 +124,16 @@ mod arch {
         command.arg("-o");
         command.arg("cargo-flamegraph.stacks");
 
-        command.arg("-c");
-        command.arg(&workload);
+        match workload {
+            Workload::Command(c) => {
+                command.arg("-c");
+                command.args(&c);
+            }
+            Workload::Pid(p) => {
+                command.arg("-p");
+                command.arg(p.to_string());
+            }
+        }
 
         command
     }
@@ -125,20 +167,24 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     status
         .signal() // the default needs to be true because that's the neutral element for `&&`
         .map_or(true, |code| {
-            code != signal_hook::SIGINT && code != signal_hook::SIGTERM
-        }) && !status.success()
+            code != signal_hook::SIGINT
+                && code != signal_hook::SIGTERM
+        })
+        && !status.success()
 }
 
 #[cfg(not(unix))]
 fn terminated_by_error(status: ExitStatus) -> bool {
-    !exit_status.success()
+    !status.success()
 }
 
-pub fn generate_flamegraph_by_running_command<
+pub fn generate_flamegraph_for_workload<
     P: AsRef<std::path::Path>,
 >(
-    workload: String,
+    workload: Workload,
     flamegraph_filename: P,
+    sudo: bool,
+    freq: Option<u32>,
 ) {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -146,12 +192,14 @@ pub fn generate_flamegraph_by_running_command<
     // generate our flamegraph.  (ctrl+c will send the
     // SIGINT signal to all processes in the foreground
     // process group).
+    #[cfg(unix)]
     let handler = unsafe {
-        signal_hook::register(signal_hook::SIGINT, || { })
+        signal_hook::register(signal_hook::SIGINT, || {})
             .expect("cannot register signal handler")
     };
 
-    let mut command = arch::initial_command(workload);
+    let mut command =
+        arch::initial_command(workload, sudo, freq);
 
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);
@@ -159,6 +207,7 @@ pub fn generate_flamegraph_by_running_command<
     let exit_status =
         recorder.wait().expect(arch::WAIT_ERROR);
 
+    #[cfg(unix)]
     signal_hook::unregister(handler);
 
     // only stop if perf exited unsuccessfully, but
