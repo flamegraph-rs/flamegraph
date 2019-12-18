@@ -303,7 +303,7 @@ fn main() {
 
     flamegraph::generate_flamegraph_for_workload(
         Workload::Command(workload),
-        &flamegraph_filename.clone(),
+        &flamegraph_filename,
         opt.root,
         opt.frequency,
     );
