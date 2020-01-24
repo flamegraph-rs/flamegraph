@@ -6,9 +6,9 @@ use structopt::StructOpt;
 use flamegraph::Workload;
 
 #[derive(Debug, StructOpt)]
-#[structopt(raw(
-    setting = "structopt::clap::AppSettings::TrailingVarArg"
-))]
+#[structopt(
+    setting = structopt::clap::AppSettings::TrailingVarArg
+)]
 struct Opt {
     /// Build with the dev profile
     #[structopt(long = "dev")]

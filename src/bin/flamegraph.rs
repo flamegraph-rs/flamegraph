@@ -5,9 +5,9 @@ use structopt::StructOpt;
 use flamegraph::Workload;
 
 #[derive(Debug, StructOpt)]
-#[structopt(raw(
-    setting = "structopt::clap::AppSettings::TrailingVarArg"
-))]
+#[structopt(
+    setting = structopt::clap::AppSettings::TrailingVarArg
+)]
 struct Opt {
     /// Output file, flamegraph.svg if not present
     #[structopt(
