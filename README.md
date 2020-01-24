@@ -20,11 +20,10 @@ Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windo
 This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems.com)
 to help their customers and workshop attendees develop high performance systems
 in the Rust programming language with low friction. If you would like to work with some of
-the world's most experienced Rust systems engineers, either to
-build systems together or to [increase your team's skills](https://ferrous-systems.com/rust-training/),
-get in touch :D
+the world's most experienced Rust systems engineers, either to build systems together or to
+increase your team's skills, get in touch :D
 
-[![Ferrous Systems](https://ferrous-systems.com/images/ferrous-logo-text.svg)](https://ferrous-systems.com/)
+[![Ferrous Systems](https://ferrous-systems.com/images/logo_256_48.svg)](https://ferrous-systems.com/)
 
 ## Installation
 
