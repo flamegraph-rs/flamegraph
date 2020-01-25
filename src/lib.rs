@@ -249,10 +249,11 @@ pub fn generate_flamegraph_for_workload<
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
-    let flamegraph_options = FlamegraphOptions::default();
+    let mut flamegraph_options =
+        FlamegraphOptions::default();
 
     from_reader(
-        flamegraph_options,
+        &mut flamegraph_options,
         collapsed_reader,
         flamegraph_writer,
     )
