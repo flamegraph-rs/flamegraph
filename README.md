@@ -29,7 +29,7 @@ increase your team's skills, get in touch :D
 
 Requirements on Linux (Ubuntu/Debian):
 ```
-sudo apt install -y linux-tools-common linux-tools-generic
+sudo apt install -y linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
