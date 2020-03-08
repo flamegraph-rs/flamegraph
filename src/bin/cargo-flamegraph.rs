@@ -157,7 +157,12 @@ fn build(opt: &Opt) {
                 continue;
             };
 
-            if workload(opt).contains(&artifact.target.name)
+            // Since workload() returns a Vec of paths, artifact.target.name could be contained in
+            // the path (e.g. in the project name). Thus .ends_with() is required to ensure the
+            // actual binary name is matched.
+            if workload(opt)
+                .iter()
+                .any(|w| w.ends_with(&artifact.target.name))
                 && artifact.profile.debuginfo.unwrap_or(0)
                     != 0
             {
@@ -166,10 +171,11 @@ fn build(opt: &Opt) {
         }
 
         if !has_debuginfo {
-            let mut profile = "release";
-            if opt.bench.is_some() {
-                profile = "bench";
-            }
+            let profile = if opt.bench.is_some() {
+                "bench"
+            } else {
+                "release"
+            };
             eprintln!(
                 "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
