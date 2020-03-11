@@ -15,16 +15,6 @@ flamegraph generation library!
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
-# Ferrous Systems
-
-This performance tool was created by the folks at [Ferrous Systems](https://ferrous-systems.com)
-to help their customers and workshop attendees develop high performance systems
-in the Rust programming language with low friction. If you would like to work with some of
-the world's most experienced Rust systems engineers, either to build systems together or to
-increase your team's skills, get in touch :D
-
-[![Ferrous Systems](https://ferrous-systems.com/images/logo_256_48.svg)](https://ferrous-systems.com/)
-
 ## Installation
 
 Requirements on Linux (Ubuntu/Debian):
