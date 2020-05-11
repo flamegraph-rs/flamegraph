@@ -52,6 +52,11 @@ cargo flamegraph --bin=stress2
 
 # if you want to pass arguments, as you would with cargo run:
 cargo flamegraph -- my-command --my-arg my-value -m -f
+
+# if you want to use interesting perf or dtrace options, use `-c`
+# this is handy for correlating things like branch-misses, cache-misses,
+# or anything else available via `perf list` or dtrace for your system
+cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
 ```
 
 ## Usage

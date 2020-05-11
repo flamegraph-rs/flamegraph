@@ -75,6 +75,14 @@ struct Opt {
     #[structopt(short = "F", long = "freq")]
     frequency: Option<u32>,
 
+    /// Custom command for invoking perf/dtrace
+    #[structopt(
+        short = "c",
+        long = "cmd",
+        conflicts_with = "freq"
+    )]
+    custom_cmd: Option<String>,
+
     trailing_arguments: Vec<String>,
 }
 
@@ -138,7 +146,7 @@ fn build(opt: &Opt) {
             .stdout;
 
         let messages =
-            cargo_metadata::parse_messages(&*output);
+            cargo_metadata::Message::parse_stream(&*output);
 
         let mut has_debuginfo = false;
 
@@ -312,6 +320,7 @@ fn main() {
         &flamegraph_filename,
         opt.root,
         opt.frequency,
+        opt.custom_cmd,
     );
 
     if opt.open {
