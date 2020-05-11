@@ -50,7 +50,7 @@ cargo flamegraph --dev
 # if you'd like to profile a specific binary:
 cargo flamegraph --bin=stress2
 
-# if you want to pass arguments, as you would with cargo run:
+# if you want to pass arguments as you would with cargo run:
 cargo flamegraph -- my-command --my-arg my-value -m -f
 
 # if you want to use interesting perf or dtrace options, use `-c`
