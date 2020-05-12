@@ -89,14 +89,19 @@ echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 
 Due to optimizations etc... sometimes the quality
 of the information presented in the flamegraph will
-suffer when profiling release builds. To counter this
-to some extent, you may set the following in your
+suffer when profiling release builds. 
+
+To counter this to some extent, you may either set the following in your
 `Cargo.toml` file:
 
 ```
 [profile.release]
 debug = true
 ```
+
+Or use the [RUSTFLAGS](https://doc.rust-lang.org/cargo/reference/config.html#buildrustflags) environment variable.
+
+i.e. `RUSTFLAGS='-g'`
 
 # Systems Performance Work Guided By Flamegraphs
 
