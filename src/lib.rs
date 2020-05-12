@@ -46,6 +46,7 @@ mod arch {
         workload: Workload,
         sudo: bool,
         freq: Option<u32>,
+        custom_cmd: Option<String>,
     ) -> Command {
         let mut command = if sudo {
             let mut c = Command::new("sudo");
@@ -55,10 +56,10 @@ mod arch {
             Command::new("perf")
         };
 
-        let args = format!(
+        let args = custom_cmd.unwrap_or(format!(
             "record -F {} --call-graph dwarf -g",
             freq.unwrap_or(99)
-        );
+        ));
 
         for arg in args.split_whitespace() {
             command.arg(arg);
@@ -100,6 +101,7 @@ mod arch {
         workload: Workload,
         sudo: bool,
         freq: Option<u32>,
+        custom_cmd: Option<String>,
     ) -> Command {
         let mut command = if sudo {
             let mut c = Command::new("sudo");
@@ -109,11 +111,11 @@ mod arch {
             Command::new("dtrace")
         };
 
-        let dtrace_script = format!(
+        let dtrace_script = custom_cmd.unwrap_or(format!(
             "profile-{} /pid == $target/ \
              {{ @[ustack(100)] = count(); }}",
             freq.unwrap_or(997)
-        );
+        ));
 
         command.arg("-x");
         command.arg("ustackframes=100");
@@ -185,6 +187,7 @@ pub fn generate_flamegraph_for_workload<
     flamegraph_filename: P,
     sudo: bool,
     freq: Option<u32>,
+    custom_cmd: Option<String>,
 ) {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -198,8 +201,9 @@ pub fn generate_flamegraph_for_workload<
             .expect("cannot register signal handler")
     };
 
-    let mut command =
-        arch::initial_command(workload, sudo, freq);
+    let mut command = arch::initial_command(
+        workload, sudo, freq, custom_cmd,
+    );
 
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);
