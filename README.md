@@ -116,10 +116,23 @@ added together. Then an SVG is generated showing the
 call stacks that were measured, widened to the proportion
 of all stack samples that contained them.
 
-When looking at a flamegraph, the main function of your
-program will be closer to the bottom, and the called
-functions will be stacked on top, with the functions
-that they call stacked on top of them, etc...
+The **y-axis** shows the stack depth number. When looking at a
+flamegraph, the main function of your program will be closer to
+the bottom, and the called functions will be stacked on top,
+with the functions that they call stacked on top of them, etc...
+
+The **x-axis** spans all of the samples. It does *not* show the
+passing of time from left to right. The left to right ordering
+has no meaning.
+
+The **width** of each box shows the total time that that
+function is on the CPU or is part of the call stack. If a
+function's box is wider than others, that means that it consumes
+more CPU per execution than other functions, or that it is
+called more than other functions.
+
+The **color** of each box isn't significant, and is chosen at
+random.
 
 Flamegraphs are good for visualizing where the most
 expensive parts of your program are at runtime,
