@@ -129,7 +129,7 @@ mod arch {
         match workload {
             Workload::Command(c) => {
                 command.arg("-c");
-                command.args(&c);
+                command.arg(&c.join(" "));
             }
             Workload::Pid(p) => {
                 command.arg("-p");
