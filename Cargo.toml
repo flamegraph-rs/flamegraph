@@ -26,3 +26,6 @@ opener = "0.4.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.1.15"
+
+[profile.release.build-override]
+opt-level = 0
