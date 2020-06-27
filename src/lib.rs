@@ -49,7 +49,8 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> Command {
-        let perf = env::var("PERF").unwrap_or("perf".to_string());
+        let perf =
+            env::var("PERF").unwrap_or("perf".to_string());
 
         let mut command = if sudo {
             let mut c = Command::new("sudo");
@@ -82,7 +83,8 @@ mod arch {
     }
 
     pub fn output() -> Vec<u8> {
-        let perf = env::var("PERF").unwrap_or("perf".to_string());
+        let perf =
+            env::var("PERF").unwrap_or("perf".to_string());
         Command::new(perf)
             .arg("script")
             .output()
@@ -107,7 +109,8 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> Command {
-        let dtrace = env::var("DTRACE").unwrap_or("dtrace".to_string());
+        let dtrace = env::var("DTRACE")
+            .unwrap_or("dtrace".to_string());
 
         let mut command = if sudo {
             let mut c = Command::new("sudo");
