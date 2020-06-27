@@ -1,4 +1,5 @@
 use std::{
+    env,
     fs::File,
     io::{BufReader, BufWriter},
     process::{Command, ExitStatus},
@@ -48,12 +49,14 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> Command {
+        let perf = env::var("PERF").unwrap_or("perf".to_string());
+
         let mut command = if sudo {
             let mut c = Command::new("sudo");
-            c.arg("perf");
+            c.arg(perf);
             c
         } else {
-            Command::new("perf")
+            Command::new(perf)
         };
 
         let args = custom_cmd.unwrap_or(format!(
@@ -79,7 +82,8 @@ mod arch {
     }
 
     pub fn output() -> Vec<u8> {
-        Command::new("perf")
+        let perf = env::var("PERF").unwrap_or("perf".to_string());
+        Command::new(perf)
             .arg("script")
             .output()
             .expect("unable to call perf script")
@@ -103,12 +107,14 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> Command {
+        let dtrace = env::var("DTRACE").unwrap_or("dtrace".to_string());
+
         let mut command = if sudo {
             let mut c = Command::new("sudo");
-            c.arg("dtrace");
+            c.arg(dtrace);
             c
         } else {
-            Command::new("dtrace")
+            Command::new(dtrace)
         };
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
