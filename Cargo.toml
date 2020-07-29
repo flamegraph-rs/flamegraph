@@ -19,10 +19,13 @@ name = "flamegraph"
 path = "src/bin/flamegraph.rs"
 
 [dependencies]
-inferno = "0.9.6"
+inferno = "0.9.8"
 structopt = "0.3.14"
 cargo_metadata = "0.10.0"
 opener = "0.4.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.1.15"
+
+[profile.release.build-override]
+opt-level = 0
