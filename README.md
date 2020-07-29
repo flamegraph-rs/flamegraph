@@ -108,6 +108,16 @@ Or use the [RUSTFLAGS](https://doc.rust-lang.org/cargo/reference/config.html#bui
 
 i.e. `RUSTFLAGS='-g'`
 
+## Use custom paths for perf and dtrace
+
+If `PERF` or `DTRACE` environment variable is set,
+it'll be used as corresponding tool command.
+For example, to use `perf` from `~/bin`:
+
+```bash
+env PERF=~/bin/perf flamegraph /path/to/my/binary
+```
+
 # Systems Performance Work Guided By Flamegraphs
 
 Flamegraphs are used to visualize where time is being spent
