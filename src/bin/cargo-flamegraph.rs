@@ -246,13 +246,12 @@ fn workload(opt: &Opt) -> Vec<String> {
 
     if opt.dev {
         binary_path.push("debug");
+    } else if opt.example.is_some() {
+        binary_path.push("examples");
     } else {
         binary_path.push("release");
     }
-
-    if opt.example.is_some() {
-        binary_path.push("examples");
-    }
+    binary_path.push("deps");
 
     let targets: Vec<String> = metadata
         .packages
