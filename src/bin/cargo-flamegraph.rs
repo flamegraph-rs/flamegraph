@@ -280,7 +280,7 @@ fn workload(opt: &Opt) -> Vec<String> {
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
     } else if let Some(ref bin) =
-        opt.bin.as_ref().or(opt.example.as_ref())
+        opt.bin.as_ref().or_else(|| opt.example.as_ref())
     {
         if targets.contains(&bin) {
             bin.to_string()
@@ -324,7 +324,7 @@ fn main() {
     let flamegraph_filename: PathBuf = opt
         .output
         .take()
-        .unwrap_or("flamegraph.svg".into());
+        .unwrap_or_else(|| "flamegraph.svg".into());
 
     flamegraph::generate_flamegraph_for_workload(
         Workload::Command(workload),

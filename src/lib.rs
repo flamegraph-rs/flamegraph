@@ -25,9 +25,6 @@ use inferno::{
     },
 };
 
-#[cfg(unix)]
-use signal_hook;
-
 pub enum Workload {
     Command(Vec<String>),
     Pid(u32),
@@ -37,11 +34,9 @@ pub enum Workload {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str =
-        "could not spawn perf";
-    pub const WAIT_ERROR: &'static str =
-        "unable to wait for perf \
-         child command to exit";
+    pub const SPAWN_ERROR: &str = "could not spawn perf";
+    pub const WAIT_ERROR: &str =
+        "unable to wait for perf child command to exit";
 
     pub(crate) fn initial_command(
         workload: Workload,

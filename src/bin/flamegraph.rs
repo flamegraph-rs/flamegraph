@@ -79,7 +79,7 @@ fn main() {
     let flamegraph_filename: PathBuf = opt
         .output
         .take()
-        .unwrap_or("flamegraph.svg".into());
+        .unwrap_or_else(|| "flamegraph.svg".into());
 
     flamegraph::generate_flamegraph_for_workload(
         workload,
