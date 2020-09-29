@@ -137,8 +137,17 @@ mod arch {
 
         match workload {
             Workload::Command(c) => {
+                let mut escaped = String::new();
+                for (i, arg) in c.iter().enumerate() {
+                    if i > 0 {
+                        escaped.push(' ');
+                    }
+                    escaped
+                        .push_str(&arg.replace(" ", "\\ "));
+                }
+
                 command.arg("-c");
-                command.args(&c);
+                command.arg(&escaped);
             }
             Workload::Pid(p) => {
                 command.arg("-p");
