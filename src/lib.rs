@@ -206,6 +206,7 @@ pub fn generate_flamegraph_for_workload<
     sudo: bool,
     freq: Option<u32>,
     custom_cmd: Option<String>,
+    verbose: bool,
 ) {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -222,6 +223,9 @@ pub fn generate_flamegraph_for_workload<
     let mut command = arch::initial_command(
         workload, sudo, freq, custom_cmd,
     );
+    if verbose {
+        println!("command {:?}", command);
+    }
 
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);

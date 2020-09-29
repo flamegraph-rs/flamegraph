@@ -71,6 +71,10 @@ struct Opt {
     #[structopt(long = "root")]
     root: bool,
 
+    /// Print extra output to help debug problems
+    #[structopt(short = "v", long = "verbose")]
+    verbose: bool,
+
     /// Sampling frequency
     #[structopt(short = "F", long = "freq")]
     frequency: Option<u32>,
@@ -127,6 +131,10 @@ fn build(opt: &Opt) {
     if let Some(ref features) = opt.features {
         cmd.arg("--features");
         cmd.arg(features);
+    }
+
+    if opt.verbose {
+        println!("build command: {:?}", cmd);
     }
 
     let mut child = cmd
@@ -309,6 +317,9 @@ fn main() {
     build(&opt);
 
     let workload = workload(&opt);
+    if opt.verbose {
+        println!("workload: {:?}", workload);
+    }
 
     let flamegraph_filename: PathBuf = opt
         .output
@@ -321,6 +332,7 @@ fn main() {
         opt.root,
         opt.frequency,
         opt.custom_cmd,
+        opt.verbose,
     );
 
     if opt.open {
