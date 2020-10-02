@@ -169,7 +169,22 @@ mod arch {
                  temporary file",
             );
 
-        buf
+        // Workaround #32 - fails parsing invalid utf8 dtrace output
+        //
+        // Intermittently, invalid utf-8 is found in cargo-flamegraph.stacks, which
+        // causes parsing to blow up with the error:
+        //
+        // > unable to collapse generated profile data: Custom { kind: InvalidData, error: StringError("stream did not contain valid UTF-8") }
+        //
+        // So here we just lossily re-encode to hopefully work around the underlying problem
+        let string = String::from_utf8_lossy(&buf);
+        let reencoded_buf = string.as_bytes().to_owned();
+
+        if reencoded_buf != buf {
+            println!("Lossily converted invalid utf-8 found in cargo-flamegraph.stacks");
+        }
+
+        reencoded_buf
     }
 }
 
