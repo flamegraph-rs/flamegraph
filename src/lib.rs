@@ -25,9 +25,6 @@ use inferno::{
     },
 };
 
-#[cfg(unix)]
-use signal_hook;
-
 pub enum Workload {
     Command(Vec<String>),
     Pid(u32),
@@ -37,11 +34,9 @@ pub enum Workload {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str =
-        "could not spawn perf";
-    pub const WAIT_ERROR: &'static str =
-        "unable to wait for perf \
-         child command to exit";
+    pub const SPAWN_ERROR: &str = "could not spawn perf";
+    pub const WAIT_ERROR: &str =
+        "unable to wait for perf child command to exit";
 
     pub(crate) fn initial_command(
         workload: Workload,
@@ -137,8 +132,17 @@ mod arch {
 
         match workload {
             Workload::Command(c) => {
+                let mut escaped = String::new();
+                for (i, arg) in c.iter().enumerate() {
+                    if i > 0 {
+                        escaped.push(' ');
+                    }
+                    escaped
+                        .push_str(&arg.replace(" ", "\\ "));
+                }
+
                 command.arg("-c");
-                command.args(&c);
+                command.arg(&escaped);
             }
             Workload::Pid(p) => {
                 command.arg("-p");
@@ -197,6 +201,7 @@ pub fn generate_flamegraph_for_workload<
     sudo: bool,
     freq: Option<u32>,
     custom_cmd: Option<String>,
+    verbose: bool,
 ) {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -213,6 +218,9 @@ pub fn generate_flamegraph_for_workload<
     let mut command = arch::initial_command(
         workload, sudo, freq, custom_cmd,
     );
+    if verbose {
+        println!("command {:?}", command);
+    }
 
     let mut recorder =
         command.spawn().expect(arch::SPAWN_ERROR);

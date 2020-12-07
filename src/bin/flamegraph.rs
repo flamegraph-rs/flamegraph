@@ -33,6 +33,10 @@ struct Opt {
     #[structopt(short = "F", long = "freq")]
     frequency: Option<u32>,
 
+    /// Print extra output to help debug problems
+    #[structopt(short = "v", long = "verbose")]
+    verbose: bool,
+
     /// Custom command for invoking perf/dtrace
     #[structopt(
         short = "c",
@@ -75,7 +79,7 @@ fn main() {
     let flamegraph_filename: PathBuf = opt
         .output
         .take()
-        .unwrap_or("flamegraph.svg".into());
+        .unwrap_or_else(|| "flamegraph.svg".into());
 
     flamegraph::generate_flamegraph_for_workload(
         workload,
@@ -83,6 +87,7 @@ fn main() {
         opt.root,
         opt.frequency,
         opt.custom_cmd,
+        opt.verbose,
     );
 
     if opt.open {
