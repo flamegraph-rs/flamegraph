@@ -261,6 +261,10 @@ fn workload(opt: &Opt) -> Vec<String> {
 
     let mut binary_path = metadata.target_directory;
 
+    if let Ok(t) = std::env::var("CARGO_BUILD_TARGET") {
+        binary_path.push(t);
+    }
+
     if opt.dev {
         binary_path.push("debug");
     } else {
