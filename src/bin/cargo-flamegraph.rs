@@ -14,6 +14,10 @@ struct Opt {
     #[structopt(long = "dev")]
     dev: bool,
 
+    /// package with the binary to run
+    #[structopt(short = "p", long = "package")]
+    package: Option<String>,
+
     /// Binary to run
     #[structopt(
         short = "b",
@@ -106,6 +110,11 @@ fn build(opt: &Opt) {
 
     if !opt.dev {
         cmd.arg("--release");
+    }
+
+    if let Some(ref package) = opt.package {
+        cmd.arg("--package");
+        cmd.arg(package);
     }
 
     if let Some(ref bin) = opt.bin {

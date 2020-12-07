@@ -43,7 +43,7 @@ mod arch {
         sudo: bool,
         freq: Option<u32>,
         custom_cmd: Option<String>,
-    ) -> Command {
+    ) -> (Command, Option<String>) {
         let perf = env::var("PERF")
             .unwrap_or_else(|_| "perf".to_string());
 
@@ -60,8 +60,22 @@ mod arch {
             freq.unwrap_or(997)
         ));
 
-        for arg in args.split_whitespace() {
+        let mut perf_output = None;
+        let mut args = args.split_whitespace();
+        while let Some(arg) = args.next() {
             command.arg(arg);
+
+            // Detect if user is setting `perf record`
+            // output file with `-o`. If so, save it in
+            // order to correctly compute perf's output in
+            // `Self::output`.
+            if arg == "-o" {
+                let next_arg = args
+                    .next()
+                    .expect("missing '-o' argument");
+                command.arg(next_arg);
+                perf_output = Some(next_arg.to_string());
+            }
         }
 
         match workload {
@@ -74,14 +88,19 @@ mod arch {
             }
         }
 
-        command
+        (command, perf_output)
     }
 
-    pub fn output() -> Vec<u8> {
+    pub fn output(perf_output: Option<String>) -> Vec<u8> {
         let perf = env::var("PERF")
             .unwrap_or_else(|_| "perf".to_string());
-        Command::new(perf)
-            .arg("script")
+        let mut command = Command::new(perf);
+        command.arg("script");
+        if let Some(perf_output) = perf_output {
+            command.arg("-i");
+            command.arg(perf_output);
+        }
+        command
             .output()
             .expect("unable to call perf script")
             .stdout
@@ -103,7 +122,7 @@ mod arch {
         sudo: bool,
         freq: Option<u32>,
         custom_cmd: Option<String>,
-    ) -> Command {
+    ) -> (Command, Option<String>) {
         let dtrace = env::var("DTRACE")
             .unwrap_or_else(|_| "dtrace".to_string());
 
@@ -150,10 +169,10 @@ mod arch {
             }
         }
 
-        command
+        (command, None)
     }
 
-    pub fn output() -> Vec<u8> {
+    pub fn output(_: Option<String>) -> Vec<u8> {
         let mut buf = vec![];
         let mut f = File::open("cargo-flamegraph.stacks")
             .expect(
@@ -215,7 +234,7 @@ pub fn generate_flamegraph_for_workload<
             .expect("cannot register signal handler")
     };
 
-    let mut command = arch::initial_command(
+    let (mut command, perf_output) = arch::initial_command(
         workload, sudo, freq, custom_cmd,
     );
     if verbose {
@@ -240,7 +259,7 @@ pub fn generate_flamegraph_for_workload<
         std::process::exit(1);
     }
 
-    let output = arch::output();
+    let output = arch::output(perf_output);
 
     let perf_reader = BufReader::new(&*output);
 
