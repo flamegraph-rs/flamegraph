@@ -67,6 +67,10 @@ struct Opt {
     #[structopt(short = "f", long = "features")]
     features: Option<String>,
 
+    /// Disable default features
+    #[structopt(long = "no-default-features")]
+    no_default_features: bool,
+
     /// Open the output .svg file with default program
     #[structopt(long = "open")]
     open: bool,
@@ -140,6 +144,10 @@ fn build(opt: &Opt) {
     if let Some(ref features) = opt.features {
         cmd.arg("--features");
         cmd.arg(features);
+    }
+
+    if opt.no_default_features {
+        cmd.arg("--no-default-features");
     }
 
     if opt.verbose {
