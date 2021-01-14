@@ -104,9 +104,7 @@ To counter this to some extent, you may either set the following in your
 debug = true
 ```
 
-Or use the [RUSTFLAGS](https://doc.rust-lang.org/cargo/reference/config.html#buildrustflags) environment variable.
-
-i.e. `RUSTFLAGS='-g'`
+Or set the environment variable [CARGO_PROFILE_RELEASE_DEBUG=true](https://doc.rust-lang.org/cargo/reference/config.html#profilenamedebug).
 
 ## Use custom paths for perf and dtrace
 
