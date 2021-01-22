@@ -227,6 +227,9 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     !status.success()
 }
 
+// False positive in clippy for non-exhaustive struct FlamegraphOptions:
+// https://github.com/rust-lang/rust-clippy/issues/6559
+#[allow(clippy::field_reassign_with_default)]
 pub fn generate_flamegraph_for_workload<
     P: AsRef<std::path::Path>,
 >(
@@ -235,6 +238,7 @@ pub fn generate_flamegraph_for_workload<
     sudo: bool,
     freq: Option<u32>,
     custom_cmd: Option<String>,
+    image_width: Option<usize>,
     verbose: bool,
 ) {
     // Handle SIGINT with an empty handler. This has the
@@ -306,6 +310,7 @@ pub fn generate_flamegraph_for_workload<
 
     let mut flamegraph_options =
         FlamegraphOptions::default();
+    flamegraph_options.image_width = image_width;
 
     from_reader(
         &mut flamegraph_options,
