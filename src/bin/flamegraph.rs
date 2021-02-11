@@ -45,9 +45,8 @@ struct Opt {
     )]
     custom_cmd: Option<String>,
 
-    /// Image width in pixels
-    #[structopt(long = "image-width")]
-    image_width: Option<usize>,
+    #[structopt(flatten)]
+    flamegraph_options: flamegraph::FlamegraphOptions,
 
     trailing_arguments: Vec<String>,
 }
@@ -91,7 +90,7 @@ fn main() {
         opt.root,
         opt.frequency,
         opt.custom_cmd,
-        opt.image_width,
+        opt.flamegraph_options.into_inferno(),
         opt.verbose,
     );
 
