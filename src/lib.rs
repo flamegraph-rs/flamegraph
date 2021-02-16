@@ -20,9 +20,7 @@ use inferno::collapse::dtrace::{
 
 use inferno::{
     collapse::Collapse,
-    flamegraph::{
-        from_reader, Options as FlamegraphOptions,
-    },
+    flamegraph::{defaults, from_reader},
 };
 
 pub enum Workload {
@@ -238,7 +236,7 @@ pub fn generate_flamegraph_for_workload<
     sudo: bool,
     freq: Option<u32>,
     custom_cmd: Option<String>,
-    image_width: Option<usize>,
+    mut flamegraph_options: inferno::flamegraph::Options,
     verbose: bool,
 ) {
     // Handle SIGINT with an empty handler. This has the
@@ -308,10 +306,6 @@ pub fn generate_flamegraph_for_workload<
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
-    let mut flamegraph_options =
-        FlamegraphOptions::default();
-    flamegraph_options.image_width = image_width;
-
     from_reader(
         &mut flamegraph_options,
         collapsed_reader,
@@ -321,4 +315,60 @@ pub fn generate_flamegraph_for_workload<
         "unable to generate a flamegraph \
          from the collapsed stack data",
     );
+}
+
+#[derive(Debug, structopt::StructOpt)]
+pub struct FlamegraphOptions {
+    /// Colors are selected such that the color of a function does not change between runs
+    #[structopt(
+        long = "deterministic",
+        conflicts_with = "hash"
+    )]
+    pub deterministic: bool,
+
+    /// Plot the flame graph up-side-down
+    #[structopt(short = "i", long = "inverted")]
+    pub inverted: bool,
+
+    /// Generate stack-reversed flame graph
+    #[structopt(
+        long = "reverse",
+        conflicts_with = "no-sort"
+    )]
+    pub reverse: bool,
+
+    /// Set embedded notes in SVG
+    #[structopt(long = "notes", value_name = "STRING")]
+    pub notes: Option<String>,
+
+    /// Omit functions smaller than <FLOAT> pixels
+    #[structopt(
+            long = "min-width",
+            default_value = &defaults::str::MIN_WIDTH,
+            value_name = "FLOAT"
+        )]
+    pub min_width: f64,
+
+    /// Image width in pixels
+    #[structopt(long = "image-width")]
+    pub image_width: Option<usize>,
+}
+
+impl FlamegraphOptions {
+    pub fn into_inferno(
+        self,
+    ) -> inferno::flamegraph::Options<'static> {
+        let mut options =
+            inferno::flamegraph::Options::default();
+        options.deterministic = self.deterministic;
+        if self.inverted {
+            options.direction =
+                inferno::flamegraph::Direction::Inverted;
+        }
+        options.reverse_stack_order = self.reverse;
+        options.notes = self.notes.unwrap_or_default();
+        options.min_width = self.min_width;
+        options.image_width = self.image_width;
+        options
+    }
 }
