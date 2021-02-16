@@ -343,11 +343,11 @@ pub struct FlamegraphOptions {
 
     /// Omit functions smaller than <FLOAT> pixels
     #[structopt(
-            long = "minwidth",
+            long = "min-width",
             default_value = &defaults::str::MIN_WIDTH,
             value_name = "FLOAT"
         )]
-    pub minwidth: f64,
+    pub min_width: f64,
 
     /// Image width in pixels
     #[structopt(long = "image-width")]
@@ -367,7 +367,7 @@ impl FlamegraphOptions {
         }
         options.reverse_stack_order = self.reverse;
         options.notes = self.notes.unwrap_or_default();
-        options.min_width = self.minwidth;
+        options.min_width = self.min_width;
         options.image_width = self.image_width;
         options
     }
