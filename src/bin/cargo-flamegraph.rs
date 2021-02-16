@@ -55,6 +55,10 @@ struct Opt {
     )]
     bench: Option<String>,
 
+    /// Path to Cargo.toml
+    #[structopt(long = "manifest-path")]
+    manifest_path: Option<PathBuf>,
+
     /// Output file, flamegraph.svg if not present
     #[structopt(
         parse(from_os_str),
@@ -142,6 +146,11 @@ fn build(opt: &Opt) {
     if let Some(ref bench) = opt.bench {
         cmd.arg("--bench");
         cmd.arg(bench);
+    }
+
+    if let Some(ref manifest_path) = opt.manifest_path {
+        cmd.arg("--manifest-path");
+        cmd.arg(manifest_path);
     }
 
     if let Some(ref features) = opt.features {
