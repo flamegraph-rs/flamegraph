@@ -117,9 +117,17 @@ enum Opts {
 
 fn build(opt: &Opt) {
     let mut cmd = std::process::Command::new("cargo");
-    cmd.arg("build");
 
-    if !opt.dev {
+    // This will build benchmarks with the `bench` profile. This is needed
+    // because the `--profile` argument for `cargo build` is unstable.
+    if !opt.dev && opt.bench.is_some() {
+        cmd.args(&["bench", "--no-run"]);
+    } else {
+        cmd.arg("build");
+    }
+
+    // do not use `--release` when we are building for `bench`
+    if !opt.dev && opt.bench.is_none() {
         cmd.arg("--release");
     }
 
