@@ -195,6 +195,23 @@ fn build(opt: &Opt) {
 
         let mut has_debuginfo = false;
 
+        let profile = if opt.bench.is_some() {
+            "bench"
+        } else {
+            "release"
+        };
+
+        // get names of binaries in the workload
+        let workload_filenames = workload(opt)
+            .iter()
+            .filter_map(|w| {
+                PathBuf::from(w)
+                    .file_name()?
+                    .to_str()
+                    .map(|filename| filename.to_owned())
+            })
+            .collect::<Vec<_>>();
+
         // This is an extremely coarse check to see
         // if any of our build artifacts have debuginfo
         // enabled.
@@ -210,25 +227,21 @@ fn build(opt: &Opt) {
                 continue;
             };
 
-            // Since workload() returns a Vec of paths, artifact.target.name could be contained in
-            // the path (e.g. in the project name). Thus .ends_with() is required to ensure the
-            // actual binary name is matched.
-            if workload(opt)
-                .iter()
-                .any(|w| w.ends_with(&artifact.target.name))
-                && artifact.profile.debuginfo.unwrap_or(0)
-                    != 0
+            // - Check that this is a binary we are interested in.
+            //   This should start with the target name (binaries can have names in format
+            //   `benchmark-deadbeef`)
+            // - The iterator is reversed because the entities we are interested in are most likely
+            //   to appear in the end of the list.
+            if workload_filenames.iter().rev().any(|w| {
+                w.starts_with(&artifact.target.name)
+            }) && artifact.profile.debuginfo.unwrap_or(0)
+                != 0
             {
                 has_debuginfo = true;
             }
         }
 
         if !has_debuginfo {
-            let profile = if opt.bench.is_some() {
-                "bench"
-            } else {
-                "release"
-            };
             eprintln!(
                 "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
