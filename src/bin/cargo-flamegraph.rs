@@ -195,6 +195,12 @@ fn build(opt: &Opt) {
 
         let mut has_debuginfo = false;
 
+        let profile = if opt.bench.is_some() {
+            "bench"
+        } else {
+            "release"
+        };
+
         // get names of binaries in the workload
         let workload_filenames = workload(opt)
             .iter()
@@ -236,11 +242,6 @@ fn build(opt: &Opt) {
         }
 
         if !has_debuginfo {
-            let profile = if opt.bench.is_some() {
-                "bench"
-            } else {
-                "release"
-            };
             eprintln!(
                 "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
