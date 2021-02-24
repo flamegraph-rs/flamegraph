@@ -89,7 +89,10 @@ mod arch {
         (command, perf_output)
     }
 
-    pub fn output(perf_output: Option<String>, script_no_inline: bool) -> Vec<u8> {
+    pub fn output(
+        perf_output: Option<String>,
+        script_no_inline: bool,
+    ) -> Vec<u8> {
         let perf = env::var("PERF")
             .unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
@@ -280,7 +283,8 @@ pub fn generate_flamegraph_for_workload<
         std::process::exit(1);
     }
 
-    let output = arch::output(perf_output, script_no_inline);
+    let output =
+        arch::output(perf_output, script_no_inline);
 
     let perf_reader = BufReader::new(&*output);
 

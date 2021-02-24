@@ -44,7 +44,7 @@ struct Opt {
         conflicts_with = "freq"
     )]
     custom_cmd: Option<String>,
-    
+
     /// Disable inlining for perf script because of performace issues
     #[structopt(long = "no-inline")]
     script_no_inline: bool,
