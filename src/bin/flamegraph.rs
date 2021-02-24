@@ -44,6 +44,10 @@ struct Opt {
         conflicts_with = "freq"
     )]
     custom_cmd: Option<String>,
+    
+    /// Disable inlining for perf script because of performace issues
+    #[structopt(long = "no-inline")]
+    script_no_inline: bool,
 
     #[structopt(flatten)]
     flamegraph_options: flamegraph::FlamegraphOptions,
@@ -88,6 +92,7 @@ fn main() {
         workload,
         &flamegraph_filename,
         opt.root,
+        opt.script_no_inline,
         opt.frequency,
         opt.custom_cmd,
         opt.flamegraph_options.into_inferno(),
