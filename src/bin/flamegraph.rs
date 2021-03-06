@@ -45,7 +45,7 @@ struct Opt {
     )]
     custom_cmd: Option<String>,
 
-    /// Disable inlining for perf script because of performace issues
+    /// Disable inlining for perf script because of performance issues
     #[structopt(long = "no-inline")]
     script_no_inline: bool,
 
