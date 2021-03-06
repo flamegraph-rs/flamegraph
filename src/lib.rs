@@ -176,7 +176,10 @@ mod arch {
         (command, None)
     }
 
-    pub fn output(_: Option<String>, script_no_inline: bool) -> Vec<u8> {
+    pub fn output(
+        _: Option<String>,
+        script_no_inline: bool,
+    ) -> Vec<u8> {
         if script_no_inline {
             eprintln!("Option --no-inline is only supported on linux systems.");
             std::process::exit(1);
