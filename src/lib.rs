@@ -89,11 +89,17 @@ mod arch {
         (command, perf_output)
     }
 
-    pub fn output(perf_output: Option<String>) -> Vec<u8> {
+    pub fn output(
+        perf_output: Option<String>,
+        script_no_inline: bool,
+    ) -> Vec<u8> {
         let perf = env::var("PERF")
             .unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
         command.arg("script");
+        if script_no_inline {
+            command.arg("--no-inline");
+        }
         if let Some(perf_output) = perf_output {
             command.arg("-i");
             command.arg(perf_output);
@@ -170,7 +176,14 @@ mod arch {
         (command, None)
     }
 
-    pub fn output(_: Option<String>) -> Vec<u8> {
+    pub fn output(
+        _: Option<String>,
+        script_no_inline: bool,
+    ) -> Vec<u8> {
+        if script_no_inline {
+            eprintln!("Option --no-inline is only supported on linux systems.");
+            std::process::exit(1);
+        }
         let mut buf = vec![];
         let mut f = File::open("cargo-flamegraph.stacks")
             .expect(
@@ -234,6 +247,7 @@ pub fn generate_flamegraph_for_workload<
     workload: Workload,
     flamegraph_filename: P,
     sudo: bool,
+    script_no_inline: bool,
     freq: Option<u32>,
     custom_cmd: Option<String>,
     mut flamegraph_options: inferno::flamegraph::Options,
@@ -276,7 +290,8 @@ pub fn generate_flamegraph_for_workload<
         std::process::exit(1);
     }
 
-    let output = arch::output(perf_output);
+    let output =
+        arch::output(perf_output, script_no_inline);
 
     let perf_reader = BufReader::new(&*output);
 

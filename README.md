@@ -39,6 +39,12 @@ usually something like `~/.cargo/bin`.
 # if you'd like to profile an arbitrary executable:
 flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
 
+# NOTE: By default, perf tries to compute which functions are
+# inlined at every stack frame for every sample. This can take
+# a very long time (see https://github.com/flamegraph-rs/flamegraph/issues/74).
+# If you don't want this, you can pass --no-inline to flamegraph:
+flamegraph --no-inline [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
+
 # cargo support provided through the cargo-flamegraph binary!
 # defaults to profiling cargo run --release
 cargo flamegraph
