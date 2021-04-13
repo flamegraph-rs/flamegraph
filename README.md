@@ -63,6 +63,12 @@ cargo flamegraph -- my-command --my-arg my-value -m -f
 # this is handy for correlating things like branch-misses, cache-misses,
 # or anything else available via `perf list` or dtrace for your system
 cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
+
+# Run criterion benchmark
+# Note that the last --bench is required for `criterion 0.3` to run in benchmark mode, instead of test mode.
+cargo flamegraph --bench some_benchmark --features some_features -- --bench` 
+
+cargo flamegraph --example some_example --features some_features
 ```
 
 ## Usage
@@ -80,6 +86,8 @@ FLAGS:
 
 OPTIONS:
     -b, --bin <bin>              Binary to run
+    --bench <bench>              Benchmark to run
+    --example <example>          Example to run
     -f, --features <features>    Build features to enable
     -o, --output <output>        Output file, flamegraph.svg if not present
 ```
@@ -111,6 +119,17 @@ debug = true
 ```
 
 Or set the environment variable [CARGO_PROFILE_RELEASE_DEBUG=true](https://doc.rust-lang.org/cargo/reference/config.html#profilenamedebug).
+
+## Usage with benchmarks
+
+In order to perf existing benchmarks, you should set up a few configs.
+Set the following in your `Cargo.toml` file to run benchmarks(flamegraph will still complain about not setting one):
+
+```
+[profile.bench]
+debug = true
+```
+
 
 ## Use custom paths for perf and dtrace
 
