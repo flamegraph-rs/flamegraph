@@ -19,7 +19,7 @@ Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windo
 
 Requirements on Linux (Ubuntu/Debian):
 ```
-sudo apt install -y linux-tools-common linux-tools-generic
+sudo apt install -y linux-perf
 ```
 
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
