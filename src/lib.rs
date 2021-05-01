@@ -20,6 +20,7 @@ use inferno::collapse::dtrace::{
 
 use inferno::{
     collapse::Collapse,
+    flamegraph::color::Palette,
     flamegraph::{defaults, from_reader},
 };
 
@@ -367,6 +368,27 @@ pub struct FlamegraphOptions {
     /// Image width in pixels
     #[structopt(long = "image-width")]
     pub image_width: Option<usize>,
+
+    /// Color palette
+    #[structopt(
+        long = "colors",
+        short = "C",
+        conflicts_with = "lang",
+        possible_values = &[
+            "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
+            "purple", "orange", "wakeup"
+        ]
+    )]
+    pub colors: Option<Palette>,
+
+    /// Color palette based on language semantics
+    #[structopt(
+        long = "lang",
+        short = "l",
+        conflicts_with = "colors",
+        possible_values = &["java", "perl", "js"]
+    )]
+    pub lang: Option<Palette>,
 }
 
 impl FlamegraphOptions {
@@ -384,6 +406,15 @@ impl FlamegraphOptions {
         options.notes = self.notes.unwrap_or_default();
         options.min_width = self.min_width;
         options.image_width = self.image_width;
+
+        // The `colors` and `lang` options are mutually exclusive
+        if let Some(colors) = self.colors {
+            options.colors = colors;
+        }
+        if let Some(lang) = self.lang {
+            options.colors = lang;
+        }
+
         options
     }
 }
