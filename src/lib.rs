@@ -371,24 +371,13 @@ pub struct FlamegraphOptions {
 
     /// Color palette
     #[structopt(
-        long = "colors",
-        short = "C",
-        conflicts_with = "lang",
+        long = "palette",
         possible_values = &[
             "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
-            "purple", "orange", "wakeup"
+            "purple", "orange", "wakeup", "java", "perl", "js", "rust"
         ]
     )]
-    pub colors: Option<Palette>,
-
-    /// Color palette based on language semantics
-    #[structopt(
-        long = "lang",
-        short = "l",
-        conflicts_with = "colors",
-        possible_values = &["java", "perl", "js"]
-    )]
-    pub lang: Option<Palette>,
+    pub palette: Option<Palette>,
 }
 
 impl FlamegraphOptions {
@@ -406,13 +395,8 @@ impl FlamegraphOptions {
         options.notes = self.notes.unwrap_or_default();
         options.min_width = self.min_width;
         options.image_width = self.image_width;
-
-        // The `colors` and `lang` options are mutually exclusive
-        if let Some(colors) = self.colors {
-            options.colors = colors;
-        }
-        if let Some(lang) = self.lang {
-            options.colors = lang;
+        if let Some(palette) = self.palette {
+            options.colors = palette;
         }
 
         options
