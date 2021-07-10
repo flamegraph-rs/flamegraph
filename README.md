@@ -66,7 +66,7 @@ cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
 
 # Run criterion benchmark
 # Note that the last --bench is required for `criterion 0.3` to run in benchmark mode, instead of test mode.
-cargo flamegraph --bench some_benchmark --features some_features -- --bench` 
+cargo flamegraph --bench some_benchmark --features some_features -- --bench`
 
 cargo flamegraph --example some_example --features some_features
 ```
@@ -92,6 +92,9 @@ OPTIONS:
     -o, --output <output>        Output file, flamegraph.svg if not present
 ```
 
+Then open the resulting `flamegraph.svg` with a browser, because most image
+viewers do not support interactive svg-files.
+
 ## Enabling perf for use by unprivileged users
 
 To enable perf without running as root, you may
@@ -108,7 +111,7 @@ echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 
 Due to optimizations etc... sometimes the quality
 of the information presented in the flamegraph will
-suffer when profiling release builds. 
+suffer when profiling release builds.
 
 To counter this to some extent, you may either set the following in your
 `Cargo.toml` file:
