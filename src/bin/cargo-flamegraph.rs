@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use cargo_metadata::Target;
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -23,6 +24,7 @@ struct Opt {
         short = "b",
         long = "bin",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -32,6 +34,7 @@ struct Opt {
     #[structopt(
         long = "example",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "test"
     )]
@@ -41,15 +44,27 @@ struct Opt {
     #[structopt(
         long = "test",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "example"
     )]
     test: Option<String>,
 
+    /// Crate target to unit test (Additional arguments for test selection can be passed as trailing arguments)
+    #[structopt(
+        long = "unit-test",
+        conflicts_with = "bench",
+        conflicts_with = "bin",
+        conflicts_with = "test",
+        conflicts_with = "example"
+    )]
+    unit_test: Option<String>,
+
     /// Benchmark to run
     #[structopt(
         long = "bench",
         conflicts_with = "bin",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -158,6 +173,10 @@ fn build(opt: &Opt) {
     if let Some(ref bench) = opt.bench {
         cmd.arg("--bench");
         cmd.arg(bench);
+    }
+
+    if opt.unit_test.is_some() {
+        cmd.arg("--tests");
     }
 
     if let Some(ref manifest_path) = opt.manifest_path {
@@ -318,19 +337,24 @@ fn workload(opt: &Opt) -> Vec<String> {
 
     if opt.example.is_some() {
         binary_path.push("examples");
-    } else if opt.bench.is_some() {
+    } else if opt.bench.is_some() || opt.unit_test.is_some()
+    {
         binary_path.push("deps");
     }
 
-    let targets: Vec<String> = metadata
+    let all_targets: Vec<Target> = metadata
         .packages
         .into_iter()
         .flat_map(|p| p.targets)
-        .filter(|t| t.crate_types.contains(&"bin".into()))
-        .map(|t| t.name)
         .collect();
 
-    if targets.is_empty() {
+    let targets: Vec<_> = all_targets
+        .iter()
+        .filter(|t| t.crate_types.contains(&"bin".into()))
+        .map(|t| &t.name)
+        .collect();
+
+    if opt.unit_test.is_none() && targets.is_empty() {
         eprintln!("no Rust binary targets found");
         std::process::exit(1);
     }
@@ -339,10 +363,14 @@ fn workload(opt: &Opt) -> Vec<String> {
         find_binary("test", &binary_path, test)
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
+    } else if let Some(ref unit_test) = opt.unit_test {
+        // minus in crate name becomes underscore in test executable name
+        let unit_test = unit_test.replace('-', "_");
+        find_binary("unit-test", &binary_path, &unit_test)
     } else if let Some(ref bin) =
         opt.bin.as_ref().or_else(|| opt.example.as_ref())
     {
-        if targets.contains(&bin) {
+        if targets.contains(bin) {
             bin.to_string()
         } else {
             eprintln!(
