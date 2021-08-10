@@ -50,7 +50,8 @@ struct Opt {
     )]
     test: Option<String>,
 
-    /// Crate target to unit test (Additional arguments for test selection can be passed as trailing arguments)
+    /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
+    /// (Additional arguments for test selection can be passed as trailing arguments)
     #[structopt(
         long = "unit-test",
         conflicts_with = "bench",
@@ -58,7 +59,7 @@ struct Opt {
         conflicts_with = "test",
         conflicts_with = "example"
     )]
-    unit_test: Option<String>,
+    unit_test: Option<Option<String>>,
 
     /// Benchmark to run
     #[structopt(
@@ -364,6 +365,14 @@ fn workload(opt: &Opt) -> Vec<String> {
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
     } else if let Some(ref unit_test) = opt.unit_test {
+        let unit_test = unit_test.as_ref().unwrap_or_else(|| match all_targets.as_slice() {
+                [target] => &target.name,
+                _ => {
+                    let all_target_names: Vec<_> = all_targets.iter().map(|t| &t.name).collect();
+                    eprintln!( "please specify unit test target explicitly, crate has multiple targets: {:?}", all_target_names);
+                    std::process::exit(1);
+                }
+            });
         // minus in crate name becomes underscore in test executable name
         let unit_test = unit_test.replace('-', "_");
         find_binary("unit-test", &binary_path, &unit_test)
