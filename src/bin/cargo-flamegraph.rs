@@ -51,7 +51,8 @@ struct Opt {
     test: Option<String>,
 
     /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
-    /// (Additional arguments for test selection can be passed as trailing arguments)
+    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// can be passed as trailing arguments after `--` as separator)
     #[structopt(
         long = "unit-test",
         conflicts_with = "bench",
