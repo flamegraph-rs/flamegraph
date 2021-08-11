@@ -87,6 +87,7 @@ struct Opt {
     #[structopt(flatten)]
     graph: flamegraph::Options,
 
+    /// Trailing arguments are passed to the binary being profiled.
     trailing_arguments: Vec<String>,
 }
 
