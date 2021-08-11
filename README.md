@@ -69,6 +69,12 @@ cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
 cargo flamegraph --bench some_benchmark --features some_features -- --bench`
 
 cargo flamegraph --example some_example --features some_features
+
+# Profile unit tests.
+# Note that a separating `--` is necessary if `--unit-test` is the last flag.
+cargo flamegraph --unit-test -- test::in::package::with::single::crate
+cargo flamegraph --unit-test crate_name -- test::in::package::with::multiple:crate
+cargo flamegraph --unit-test --dev test::may::omit::separator::if::unit::test::flag::not::last::flag
 ```
 
 ## Usage
@@ -77,19 +83,44 @@ cargo flamegraph --example some_example --features some_features
 
 ```
 USAGE:
-    cargo flamegraph [FLAGS] [OPTIONS] -- [[ARGS_FOR_YOUR_BINARY]]
+    cargo-flamegraph flamegraph [FLAGS] [OPTIONS] [trailing-arguments]...
 
 FLAGS:
-    -h, --help       Prints help information
-    -r, --release    Activate release mode
-    -V, --version    Prints version information
+        --deterministic          Colors are selected such that the color of a function does not change between runs
+        --dev                    Build with the dev profile
+    -h, --help                   Prints help information
+    -i, --inverted               Plot the flame graph up-side-down
+        --no-default-features    Disable default features
+        --open                   Open the output .svg file with default program
+        --reverse                Generate stack-reversed flame graph
+        --root                   Run with root privileges (using `sudo`)
+        --no-inline              Disable inlining for perf script because of performace issues
+    -V, --version                Prints version information
+    -v, --verbose                Print extra output to help debug problems
 
 OPTIONS:
-    -b, --bin <bin>              Binary to run
-    --bench <bench>              Benchmark to run
-    --example <example>          Example to run
-    -f, --features <features>    Build features to enable
-    -o, --output <output>        Output file, flamegraph.svg if not present
+        --bench <bench>                    Benchmark to run
+    -b, --bin <bin>                        Binary to run
+    -c, --cmd <custom-cmd>                 Custom command for invoking perf/dtrace
+        --example <example>                Example to run
+    -f, --features <features>              Build features to enable
+    -F, --freq <frequency>                 Sampling frequency
+        --image-width <image-width>        Image width in pixels
+        --manifest-path <manifest-path>    Path to Cargo.toml
+        --min-width <FLOAT>                Omit functions smaller than <FLOAT> pixels [default: 0.1]
+        --notes <STRING>                   Set embedded notes in SVG
+    -o, --output <output>                  Output file, flamegraph.svg if not present
+    -p, --package <package>                package with the binary to run
+        --palette <palette>                Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow,
+                                           purple, orange, wakeup, java, perl, js, rust]
+        --test <test>                      Test binary to run (currently profiles the test harness and all tests in the
+                                           binary)
+        --unit-test <unit-test>            Crate target to unit test, <unit-test> may be omitted if crate only has one
+                                           target (currently profiles the test harness and all tests in the binary; test
+                                           selection can be passed as trailing arguments after `--` as separator)
+
+ARGS:
+    <trailing-arguments>...    
 ```
 
 Then open the resulting `flamegraph.svg` with a browser, because most image
