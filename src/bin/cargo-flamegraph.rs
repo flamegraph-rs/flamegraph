@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use cargo_metadata::{Artifact, Message};
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -119,8 +120,9 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt) {
-    let mut cmd = std::process::Command::new("cargo");
+fn build(opt: &Opt) -> Vec<Artifact> {
+    use std::process::{Command, Output};
+    let mut cmd = Command::new("cargo");
 
     // This will build benchmarks with the `bench` profile. This is needed
     // because the `--profile` argument for `cargo build` is unstable.
@@ -174,91 +176,86 @@ fn build(opt: &Opt) {
         cmd.arg("--no-default-features");
     }
 
+    cmd.arg("--message-format=json");
+
     if opt.verbose {
         println!("build command: {:?}", cmd);
     }
 
-    let mut child = cmd
-        .spawn()
-        .expect("failed to spawn cargo build command");
+    let Output {
+        status,
+        stdout,
+        stderr,
+    } = cmd
+        .output()
+        .expect("failed to execute cargo build command");
 
-    let exit_status = child.wait().expect(
-        "failed to wait for cargo build child to finish",
-    );
+    let messages = Message::parse_stream(&*stdout);
+    let artifacts: Vec<_> = messages
+        .filter_map(|m| match m {
+            Ok(Message::CompilerArtifact(artifact)) => {
+                Some(artifact)
+            }
+            Ok(_) => None,
+            Err(e) => {
+                panic!("failed to parse cargo build output: {:?}", e);
+            }
+        })
+        .collect();
 
     if !opt.dev {
-        cmd.arg("--message-format=json");
+        check_debug_info(opt, &artifacts);
+    }
 
-        let output: Vec<u8> = cmd
-            .output()
-            .expect("failed to execute cargo build command")
-            .stdout;
+    if !status.success() {
+        eprintln!("cargo build failed: {:?}", stderr);
+        std::process::exit(1);
+    }
 
-        let messages =
-            cargo_metadata::Message::parse_stream(&*output);
+    artifacts
+}
 
-        let mut has_debuginfo = false;
+fn check_debug_info(opt: &Opt, artifacts: &[Artifact]) {
+    let workload_filenames = workload(opt)
+        .iter()
+        .filter_map(|w| {
+            PathBuf::from(w)
+                .file_name()?
+                .to_str()
+                .map(|filename| filename.to_owned())
+        })
+        .collect::<Vec<_>>();
 
+    let mut has_debuginfo = false;
+    for artifact in artifacts {
+        // - Check that this is a binary we are interested in.
+        //   This should start with the target name (binaries can have names in format
+        //   `benchmark-deadbeef`)
+        // - The iterator is reversed because the entities we are interested in are most likely
+        //   to appear in the end of the list.
+        has_debuginfo |=
+            artifact.profile.debuginfo.unwrap_or(0) != 0
+                && workload_filenames.iter().rev().any(
+                    |w| {
+                        w.starts_with(&artifact.target.name)
+                    },
+                );
+    }
+
+    if !has_debuginfo {
         let profile = if opt.bench.is_some() {
             "bench"
         } else {
             "release"
         };
 
-        // get names of binaries in the workload
-        let workload_filenames = workload(opt)
-            .iter()
-            .filter_map(|w| {
-                PathBuf::from(w)
-                    .file_name()?
-                    .to_str()
-                    .map(|filename| filename.to_owned())
-            })
-            .collect::<Vec<_>>();
-
-        // This is an extremely coarse check to see
-        // if any of our build artifacts have debuginfo
-        // enabled.
-        for message in messages {
-            let artifact = if let Ok(
-                cargo_metadata::Message::CompilerArtifact(
-                    artifact,
-                ),
-            ) = message
-            {
-                artifact
-            } else {
-                continue;
-            };
-
-            // - Check that this is a binary we are interested in.
-            //   This should start with the target name (binaries can have names in format
-            //   `benchmark-deadbeef`)
-            // - The iterator is reversed because the entities we are interested in are most likely
-            //   to appear in the end of the list.
-            if workload_filenames.iter().rev().any(|w| {
-                w.starts_with(&artifact.target.name)
-            }) && artifact.profile.debuginfo.unwrap_or(0)
-                != 0
-            {
-                has_debuginfo = true;
-            }
-        }
-
-        if !has_debuginfo {
-            eprintln!(
-                "\nWARNING: building without debuginfo. \
+        eprintln!(
+            "\nWARNING: building without debuginfo. \
                  Enable symbol information by adding \
                  the following lines to Cargo.toml:\n"
-            );
-            eprintln!("[profile.{}]", profile);
-            eprintln!("debug = true\n");
-        }
-    }
-
-    if !exit_status.success() {
-        eprintln!("cargo build failed: {:?}", child.stderr);
-        std::process::exit(1);
+        );
+        eprintln!("[profile.{}]", profile);
+        eprintln!("debug = true\n");
     }
 }
 
