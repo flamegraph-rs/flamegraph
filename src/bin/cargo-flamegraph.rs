@@ -116,6 +116,30 @@ impl Opt {
             || self.example.is_some()
             || self.test.is_some()
     }
+
+    fn target_kind(&self) -> &'static str {
+        match self {
+            Opt { bin: Some(_), .. } => "bin",
+            Opt {
+                example: Some(_), ..
+            } => "example",
+            Opt { test: Some(_), .. } => "test",
+            Opt { bench: Some(_), .. } => "bench",
+            _ => panic!("No target for profiling."),
+        }
+    }
+
+    fn target_name(&self) -> &str {
+        match self {
+            Opt { bin: Some(t), .. } => &t,
+            Opt {
+                example: Some(t), ..
+            } => &t,
+            Opt { test: Some(t), .. } => &t,
+            Opt { bench: Some(t), .. } => &t,
+            _ => panic!("No target for profiling."),
+        }
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -247,17 +271,8 @@ fn select_executable(
     opt: &Opt,
     artifacts: &[Artifact],
 ) -> PathBuf {
-    let (target, kind) = match opt {
-        Opt { bin: Some(t), .. } => (t, "bin".to_owned()),
-        Opt {
-            example: Some(t), ..
-        } => (t, "example".to_owned()),
-        Opt { test: Some(t), .. } => (t, "test".to_owned()),
-        Opt { bench: Some(t), .. } => {
-            (t, "bench".to_owned())
-        }
-        _ => unimplemented!(),
-    };
+    let target = opt.target_name();
+    let kind = opt.target_kind().to_owned();
 
     if artifacts.iter().all(|a| a.executable.is_none()) {
         eprintln!( "build artifacts do not contain any executable to profile");
