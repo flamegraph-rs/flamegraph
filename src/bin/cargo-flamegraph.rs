@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use cargo_metadata::{Artifact, Message};
@@ -110,6 +109,15 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
+impl Opt {
+    fn has_explicit_target(&self) -> bool {
+        self.bin.is_some()
+            || self.bench.is_some()
+            || self.example.is_some()
+            || self.test.is_some()
+    }
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "cargo-flamegraph",
@@ -203,46 +211,22 @@ fn build(opt: &Opt) -> Vec<Artifact> {
         })
         .collect();
 
-    if !opt.dev {
-        check_debug_info(opt, &artifacts);
-    }
-
     if !status.success() {
-        eprintln!("cargo build failed: {:?}", stderr);
+        eprintln!(
+            "cargo build failed: {}",
+            String::from_utf8_lossy(&stderr)
+        );
         std::process::exit(1);
     }
 
     artifacts
 }
 
-fn check_debug_info(opt: &Opt, artifacts: &[Artifact]) {
-    let workload_filenames = workload(opt)
-        .iter()
-        .filter_map(|w| {
-            PathBuf::from(w)
-                .file_name()?
-                .to_str()
-                .map(|filename| filename.to_owned())
-        })
-        .collect::<Vec<_>>();
+fn check_debug_info(opt: &Opt, artifact: &Artifact) {
+    const NONE: u32 = 0;
+    let debug = artifact.profile.debuginfo.unwrap_or(NONE);
 
-    let mut has_debuginfo = false;
-    for artifact in artifacts {
-        // - Check that this is a binary we are interested in.
-        //   This should start with the target name (binaries can have names in format
-        //   `benchmark-deadbeef`)
-        // - The iterator is reversed because the entities we are interested in are most likely
-        //   to appear in the end of the list.
-        has_debuginfo |=
-            artifact.profile.debuginfo.unwrap_or(0) != 0
-                && workload_filenames.iter().rev().any(
-                    |w| {
-                        w.starts_with(&artifact.target.name)
-                    },
-                );
-    }
-
-    if !has_debuginfo {
+    if debug == NONE {
         let profile = if opt.bench.is_some() {
             "bench"
         } else {
@@ -250,7 +234,7 @@ fn check_debug_info(opt: &Opt, artifacts: &[Artifact]) {
         };
 
         eprintln!(
-            "\nWARNING: building without debuginfo. \
+            "\nWARNING: profiling without debuginfo. \
                  Enable symbol information by adding \
                  the following lines to Cargo.toml:\n"
         );
@@ -259,109 +243,63 @@ fn check_debug_info(opt: &Opt, artifacts: &[Artifact]) {
     }
 }
 
-fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
-    // Ignorance-based error handling. We really do not care about any errors
-    // popping up from the filesystem search here. Thus, we just bash them into
-    // place using `Option`s monadic properties. Not pretty though.
-    fs::read_dir(path)
-        .ok()
-        .and_then(|mut r| {
-            r.find(|f| {
-                if let Ok(f) = f {
-                    let file_name = f.file_name();
-                    let name = file_name.to_string_lossy();
-                    name.starts_with(bin)
-                        && !name.ends_with(".d")
-                } else {
-                    false
-                }
-            })
-            .and_then(|r| r.ok())
-        })
-        .and_then(|f| {
-            f.path()
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-        })
-        .unwrap_or_else(|| {
-            eprintln!(
-                "could not find desired target {} \
-                 in the {} targets for this crate",
-                bin, ty
-            );
-            std::process::exit(1);
-        })
-}
+fn select_executable(
+    opt: &Opt,
+    artifacts: &[Artifact],
+) -> PathBuf {
+    let (target, kind) = match opt {
+        Opt { bin: Some(t), .. } => (t, "bin".to_owned()),
+        Opt {
+            example: Some(t), ..
+        } => (t, "example".to_owned()),
+        Opt { test: Some(t), .. } => (t, "test".to_owned()),
+        Opt { bench: Some(t), .. } => {
+            (t, "bench".to_owned())
+        }
+        _ => unimplemented!(),
+    };
 
-fn workload(opt: &Opt) -> Vec<String> {
-    let mut metadata_cmd =
-        cargo_metadata::MetadataCommand::new();
-    metadata_cmd.no_deps();
-    let metadata = metadata_cmd
-        .exec()
-        .expect("could not access crate metadata");
-
-    let mut binary_path = metadata.target_directory;
-
-    if let Ok(t) = std::env::var("CARGO_BUILD_TARGET") {
-        binary_path.push(t);
-    }
-
-    if opt.dev {
-        binary_path.push("debug");
-    } else {
-        binary_path.push("release");
-    }
-
-    if opt.example.is_some() {
-        binary_path.push("examples");
-    } else if opt.bench.is_some() {
-        binary_path.push("deps");
-    }
-
-    let targets: Vec<String> = metadata
-        .packages
-        .into_iter()
-        .flat_map(|p| p.targets)
-        .filter(|t| t.crate_types.contains(&"bin".into()))
-        .map(|t| t.name)
-        .collect();
-
-    if targets.is_empty() {
-        eprintln!("no Rust binary targets found");
+    if artifacts.iter().all(|a| a.executable.is_none()) {
+        eprintln!( "build artifacts do not contain any executable to profile");
         std::process::exit(1);
     }
 
-    let target = if let Some(ref test) = opt.test {
-        find_binary("test", &binary_path, test)
-    } else if let Some(ref bench) = opt.bench {
-        find_binary("bench", &binary_path, bench)
-    } else if let Some(ref bin) =
-        opt.bin.as_ref().or_else(|| opt.example.as_ref())
-    {
-        if targets.contains(&bin) {
-            bin.to_string()
-        } else {
-            eprintln!(
-                "could not find desired target {} \
-                 in the targets for this crate: {:?}",
-                bin, targets
-            );
-            std::process::exit(1);
-        }
-    } else if targets.len() == 1 {
-        targets[0].to_owned()
-    } else {
+    // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
+    // If you know why, feel free to PR and handle kind properly.
+    let artifact = artifacts.iter().find(|a| {
+        &a.target.name == target
+            && a.target.kind.contains(&kind)
+            && a.executable.is_some()
+    });
+
+    let artifact = artifact.unwrap_or_else(|| {
+        let targets: Vec<_> = artifacts
+            .iter()
+            .map(|a| (&a.target.kind, &a.target.name))
+            .collect();
         eprintln!(
-            "several possible targets found: {:?}, \
-             please pass `--bin <binary>` or `--example <example>` \
-             to cargo flamegraph to choose one of them",
+            "could not find desired target {:?} \
+                 in the targets for this crate: {:?}",
+            (kind, target),
             targets
         );
         std::process::exit(1);
-    };
+    });
 
-    binary_path.push(target);
+    check_debug_info(opt, artifact);
+
+    artifact
+        .executable
+        .clone()
+        // filtered above in find predicate
+        .expect("target artifact does have an executable")
+}
+
+fn workload(
+    opt: &Opt,
+    artifacts: &[Artifact],
+) -> Vec<String> {
+    let binary_path = select_executable(opt, artifacts);
 
     let mut result = opt.trailing_arguments.clone();
     result.insert(0, binary_path.to_string_lossy().into());
@@ -371,9 +309,13 @@ fn workload(opt: &Opt) -> Vec<String> {
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    build(&opt);
+    if !opt.has_explicit_target() {
+        unimplemented!("select bin target.");
+    }
 
-    let workload = workload(&opt);
+    let artifacts = build(&opt);
+    let workload = workload(&opt, &artifacts);
+
     if opt.verbose {
         println!("workload: {:?}", workload);
     }
