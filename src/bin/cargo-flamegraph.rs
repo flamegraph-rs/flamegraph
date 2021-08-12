@@ -131,12 +131,12 @@ impl Opt {
 
     fn target_name(&self) -> &str {
         match self {
-            Opt { bin: Some(t), .. } => &t,
+            Opt { bin: Some(t), .. } => t,
             Opt {
                 example: Some(t), ..
-            } => &t,
-            Opt { test: Some(t), .. } => &t,
-            Opt { bench: Some(t), .. } => &t,
+            } => t,
+            Opt { test: Some(t), .. } => t,
+            Opt { bench: Some(t), .. } => t,
             _ => panic!("No target for profiling."),
         }
     }
@@ -282,7 +282,7 @@ fn select_executable(
     // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
     // If you know why, feel free to PR and handle kind properly.
     let artifact = artifacts.iter().find(|a| {
-        &a.target.name == target
+        a.target.name == target
             && a.target.kind.contains(&kind)
             && a.executable.is_some()
     });
