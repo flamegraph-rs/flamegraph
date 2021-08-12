@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use cargo_metadata::{Artifact, Message};
+use cargo_metadata::{Artifact, Message, MetadataCommand};
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -306,11 +306,47 @@ fn workload(
     result
 }
 
+fn find_unique_bin_target() -> String {
+    let mut metadata_command = MetadataCommand::new();
+    metadata_command.no_deps();
+    let metadata = metadata_command
+        .exec()
+        .expect("failed to access crate metadata");
+
+    let bin_targets: Vec<String> = metadata
+        .packages
+        .into_iter()
+        .flat_map(|p| p.targets.into_iter())
+        .filter(|t| t.kind.contains(&"bin".into()))
+        .map(|t| t.name)
+        .collect();
+
+    match bin_targets.as_slice() {
+        [target] => target.clone(),
+        [] => {
+            eprintln!(
+                "crate has no binary targets: try passing \
+                    `--example <example>` or similar to choose a binary"
+            );
+            std::process::exit(1);
+        }
+        _ => {
+            eprintln!(
+                "several possible targets found: {:?}, \
+                     please pass `--bin <binary>` or `--example <example>` \
+                     to cargo flamegraph to choose one of them",
+                bin_targets
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
     if !opt.has_explicit_target() {
-        unimplemented!("select bin target.");
+        opt.bin = find_unique_bin_target().into();
     }
 
     let artifacts = build(&opt);
