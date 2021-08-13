@@ -258,6 +258,11 @@ fn check_debug_info(opt: &Opt, artifact: &Artifact) {
         );
         eprintln!("[profile.{}]", profile);
         eprintln!("debug = true\n");
+        eprintln!("Or set this environment variable:\n");
+        eprintln!(
+            "CARGO_PROFILE_{}_DEBUG=true\n",
+            profile.to_uppercase()
+        );
     }
 }
 
@@ -331,7 +336,13 @@ fn find_unique_bin_target() -> String {
         .collect();
 
     match bin_targets.as_slice() {
-        [target] => target.clone(),
+        [target] => {
+            eprintln!(
+                "automatically selected {} as it is the only binary target",
+                target
+            );
+            target.clone()
+        }
         [] => {
             eprintln!(
                 "crate has no binary targets: try passing \
