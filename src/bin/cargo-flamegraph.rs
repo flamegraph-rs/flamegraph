@@ -153,7 +153,7 @@ enum Opts {
 }
 
 fn build(opt: &Opt) -> Vec<Artifact> {
-    use std::process::{Command, Output};
+    use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
     // This will build benchmarks with the `bench` profile. This is needed
@@ -208,17 +208,14 @@ fn build(opt: &Opt) -> Vec<Artifact> {
         cmd.arg("--no-default-features");
     }
 
-    cmd.arg("--message-format=json");
+    cmd.arg("--message-format=json-render-diagnostics");
 
     if opt.verbose {
         println!("build command: {:?}", cmd);
     }
 
-    let Output {
-        status,
-        stdout,
-        stderr,
-    } = cmd
+    let Output { status, stdout, .. } = cmd
+        .stderr(Stdio::inherit())
         .output()
         .expect("failed to execute cargo build command");
 
@@ -236,10 +233,7 @@ fn build(opt: &Opt) -> Vec<Artifact> {
         .collect();
 
     if !status.success() {
-        eprintln!(
-            "cargo build failed: {}",
-            String::from_utf8_lossy(&stderr)
-        );
+        eprintln!("cargo build failed!");
         std::process::exit(1);
     }
 
