@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use cargo_metadata::{Artifact, Message, MetadataCommand};
+use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -281,17 +281,33 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
     result
 }
 
-fn find_unique_bin_target() -> String {
-    let mut bin_targets: Vec<String> = MetadataCommand::new()
+#[derive(Clone, Debug)]
+struct BinaryTarget {
+    package: String,
+    target: String,
+}
+
+impl std::fmt::Display for BinaryTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "target {} in package {}", self.target, self.package)
+    }
+}
+
+fn find_unique_bin_target() -> BinaryTarget {
+    let mut bin_targets: Vec<BinaryTarget> = MetadataCommand::new()
         .no_deps()
         .exec()
         .expect("failed to access crate metadata")
         .packages
         .into_iter()
         .flat_map(|p| {
-            p.targets
-                .into_iter()
-                .filter_map(|t| t.kind.contains(&"bin".into()).then(|| t.name))
+            let Package { targets, name, .. } = p;
+            targets.into_iter().filter_map(move |t| {
+                t.kind.contains(&"bin".into()).then(|| BinaryTarget {
+                    package: name.clone(),
+                    target: t.name,
+                })
+            })
         })
         .collect();
 
@@ -323,7 +339,9 @@ fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
     if !opt.has_explicit_target() {
-        opt.bin = find_unique_bin_target().into();
+        let BinaryTarget { target, package } = find_unique_bin_target();
+        opt.bin = target.into();
+        opt.package = package.into();
     }
 
     let artifacts = build(&opt);
