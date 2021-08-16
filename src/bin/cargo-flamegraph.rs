@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use cargo_metadata::{
     Artifact, Message, MetadataCommand, Package,
 };
+
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -25,6 +26,7 @@ struct Opt {
         short = "b",
         long = "bin",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -34,6 +36,7 @@ struct Opt {
     #[structopt(
         long = "example",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "test"
     )]
@@ -43,15 +46,29 @@ struct Opt {
     #[structopt(
         long = "test",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "example"
     )]
     test: Option<String>,
 
+    /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
+    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// can be passed as trailing arguments after `--` as separator)
+    #[structopt(
+        long = "unit-test",
+        conflicts_with = "bench",
+        conflicts_with = "bin",
+        conflicts_with = "test",
+        conflicts_with = "example"
+    )]
+    unit_test: Option<Option<String>>,
+
     /// Benchmark to run
     #[structopt(
         long = "bench",
         conflicts_with = "bin",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -194,6 +211,10 @@ fn build(opt: &Opt) -> Vec<Artifact> {
     if let Some(ref bench) = opt.bench {
         cmd.arg("--bench");
         cmd.arg(bench);
+    }
+
+    if opt.unit_test.is_some() {
+        cmd.arg("--tests");
     }
 
     if let Some(ref manifest_path) = opt.manifest_path {
