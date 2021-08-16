@@ -134,16 +134,22 @@ impl Opt {
             || self.bench.is_some()
             || self.example.is_some()
             || self.test.is_some()
+            || self.unit_test.is_some()
     }
 
-    fn target_kind(&self) -> &'static str {
+    fn valid_target_kinds(
+        &self,
+    ) -> &'static [&'static str] {
         match self {
-            Opt { bin: Some(_), .. } => "bin",
+            Opt { bin: Some(_), .. } => &["bin"],
             Opt {
                 example: Some(_), ..
-            } => "example",
-            Opt { test: Some(_), .. } => "test",
-            Opt { bench: Some(_), .. } => "bench",
+            } => &["example"],
+            Opt { test: Some(_), .. } => &["test"],
+            Opt { bench: Some(_), .. } => &["bench"],
+            Opt {
+                unit_test: Some(_), ..
+            } => &["bin", "lib"],
             _ => panic!("No target for profiling."),
         }
     }
@@ -156,6 +162,10 @@ impl Opt {
             } => t,
             Opt { test: Some(t), .. } => t,
             Opt { bench: Some(t), .. } => t,
+            Opt {
+                unit_test: Some(Some(t)),
+                ..
+            } => t,
             _ => panic!("No target for profiling."),
         }
     }
@@ -294,7 +304,7 @@ fn select_executable(
     artifacts: &[Artifact],
 ) -> PathBuf {
     let target = opt.target_name();
-    let kind = opt.target_kind().to_owned();
+    let kinds = opt.valid_target_kinds();
 
     if artifacts.iter().all(|a| a.executable.is_none()) {
         eprintln!( "build artifacts do not contain any executable to profile");
@@ -305,7 +315,10 @@ fn select_executable(
     // If you know why, feel free to PR and handle kind properly.
     let artifact = artifacts.iter().find(|a| {
         a.target.name == target
-            && a.target.kind.contains(&kind)
+            && a.target
+                .kind
+                .iter()
+                .any(|t| kinds.contains(&t.as_str()))
             && a.executable.is_some()
     });
 
@@ -317,7 +330,7 @@ fn select_executable(
         eprintln!(
             "could not find desired target {:?} \
                  in the targets for this crate: {:?}",
-            (kind, target),
+            (kinds, target),
             targets
         );
         std::process::exit(1);
@@ -362,14 +375,16 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
-fn find_unique_bin_target() -> BinaryTarget {
+fn find_targets(
+    crate_kinds: &[String],
+) -> Vec<BinaryTarget> {
     let mut metadata_command = MetadataCommand::new();
     metadata_command.no_deps();
     let metadata = metadata_command
         .exec()
         .expect("failed to access crate metadata");
 
-    let bin_targets: Vec<BinaryTarget> = metadata
+    let targets: Vec<BinaryTarget> = metadata
         .packages
         .into_iter()
         .flat_map(|p| {
@@ -378,12 +393,54 @@ fn find_unique_bin_target() -> BinaryTarget {
                 .into_iter()
                 .map(move |t| (name.clone(), t))
         })
-        .filter(|(_, t)| t.kind.contains(&"bin".into()))
+        .filter(|(_, t)| {
+            crate_kinds
+                .iter()
+                .any(|kind| t.kind.contains(kind))
+        })
         .map(|(p, t)| BinaryTarget {
             package: p,
             target: t.name,
         })
         .collect();
+
+    targets
+}
+
+fn find_unique_unit_test_target() -> BinaryTarget {
+    let allowed_kinds = ["bin".into(), "lib".into()];
+    let targets = find_targets(&allowed_kinds);
+
+    match targets.as_slice() {
+        [target] => {
+            eprintln!(
+                "automatically selected {} as it is the only unit test target",
+                target
+            );
+            target.clone()
+        }
+        [] => {
+            eprintln!(
+                "crate has no unit test targets: try passing \
+                    `--example <example>` or similar to choose a binary"
+            );
+            std::process::exit(1);
+        }
+        _ => {
+            eprintln!(
+                "several possible targets found: {:?}, \
+                     please pass `--unit-test <target>` to cargo flamegraph \
+                     to choose one of them",
+                targets
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+fn find_unique_bin_target() -> BinaryTarget {
+    let allowed_kinds = ["bin".into()];
+    let bin_targets = find_targets(&allowed_kinds);
 
     match bin_targets.as_slice() {
         [target] => {
@@ -419,6 +476,13 @@ fn main() {
         let BinaryTarget { target, package } =
             find_unique_bin_target();
         opt.bin = target.into();
+        opt.package = package.into();
+    }
+
+    if let Some(None) = opt.unit_test {
+        let BinaryTarget { target, package } =
+            find_unique_unit_test_target();
+        opt.unit_test = Some(target.into());
         opt.package = package.into();
     }
 
