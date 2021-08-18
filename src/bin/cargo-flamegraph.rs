@@ -137,19 +137,18 @@ impl Opt {
             || self.unit_test.is_some()
     }
 
-    fn valid_target_kinds(
-        &self,
-    ) -> &'static [&'static str] {
+    fn kind(&self) -> TargetKind {
         match self {
-            Opt { bin: Some(_), .. } => &["bin"],
+            Opt { bin: Some(_), .. } => TargetKind::Bin,
             Opt {
                 example: Some(_), ..
-            } => &["example"],
-            Opt { test: Some(_), .. } => &["test"],
-            Opt { bench: Some(_), .. } => &["bench"],
+            } => TargetKind::Example,
+            Opt { test: Some(_), .. } => TargetKind::Test,
+            Opt { bench: Some(_), .. } => TargetKind::Bench,
             Opt {
-                unit_test: Some(_), ..
-            } => &["bin", "lib"],
+                unit_test: Some(Some(_)),
+                ..
+            } => TargetKind::UnitTest,
             _ => panic!("No target for profiling."),
         }
     }
@@ -181,51 +180,61 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt) -> Vec<Artifact> {
+// TODO make OptTarget struct that contains target name, kind, crate kind for unit test,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetKind {
+    Bin,
+    Example,
+    UnitTest,
+    Test,
+    Bench,
+}
+
+fn build(
+    target: &VerifiedTarget,
+    opt: &Opt,
+) -> Vec<Artifact> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
-    // This will build benchmarks with the `bench` profile. This is needed
-    // because the `--profile` argument for `cargo build` is unstable.
-    if !opt.dev && opt.bench.is_some() {
-        cmd.args(&["bench", "--no-run"]);
-    } else {
-        cmd.arg("build");
+    let kind = opt.kind();
+    let name = &target.target;
+    match kind {
+        TargetKind::Bin => {
+            cmd.args(&["build", "--bin", name]);
+        }
+        TargetKind::Example => {
+            cmd.args(&["build", "--example", name]);
+        }
+        TargetKind::Test => {
+            cmd.args(&["build", "--test", name]);
+        }
+        TargetKind::UnitTest => {
+            if target.kind.contains(&"lib".to_owned()) {
+                cmd.args(&["test", "--no-run", "--lib"]);
+            } else {
+                cmd.args(&[
+                    "test", "--no-run", "--bin", name,
+                ]);
+            }
+        }
+        TargetKind::Bench => {
+            if opt.dev {
+                cmd.args(&["build", "--bench", name]);
+            } else {
+                // This will build benchmarks with the `bench` profile. This is needed
+                // because the `--profile` argument for `cargo build` is unstable.
+                cmd.args(&["bench", "--no-run", name]);
+            }
+        }
     }
 
     // do not use `--release` when we are building for `bench`
-    if !opt.dev && opt.bench.is_none() {
+    if !opt.dev && kind != TargetKind::Bench {
         cmd.arg("--release");
     }
 
-    if let Some(ref package) = opt.package {
-        cmd.arg("--package");
-        cmd.arg(package);
-    }
-
-    if let Some(ref bin) = opt.bin {
-        cmd.arg("--bin");
-        cmd.arg(bin);
-    }
-
-    if let Some(ref example) = opt.example {
-        cmd.arg("--example");
-        cmd.arg(example);
-    }
-
-    if let Some(ref test) = opt.test {
-        cmd.arg("--test");
-        cmd.arg(test);
-    }
-
-    if let Some(ref bench) = opt.bench {
-        cmd.arg("--bench");
-        cmd.arg(bench);
-    }
-
-    if opt.unit_test.is_some() {
-        cmd.arg("--tests");
-    }
+    cmd.args(&["--package", &target.package]);
 
     if let Some(ref manifest_path) = opt.manifest_path {
         cmd.arg("--manifest-path");
@@ -273,38 +282,43 @@ fn build(opt: &Opt) -> Vec<Artifact> {
     artifacts
 }
 
-fn check_debug_info(opt: &Opt, artifact: &Artifact) {
+fn check_debug_info(
+    target: &VerifiedTarget,
+    artifact: &Artifact,
+) {
     const NONE: u32 = 0;
     let debug = artifact.profile.debuginfo.unwrap_or(NONE);
 
-    if debug == NONE {
-        let profile = if opt.bench.is_some() {
-            "bench"
-        } else {
-            "release"
-        };
+    if debug != NONE {
+        return;
+    }
 
-        eprintln!(
-            "\nWARNING: profiling without debuginfo. \
+    let profile = if target.is_kind(TargetKind::Bench) {
+        "bench"
+    } else {
+        "release"
+    };
+
+    eprintln!(
+        "\nWARNING: profiling without debuginfo. \
                  Enable symbol information by adding \
                  the following lines to Cargo.toml:\n"
-        );
-        eprintln!("[profile.{}]", profile);
-        eprintln!("debug = true\n");
-        eprintln!("Or set this environment variable:\n");
-        eprintln!(
-            "CARGO_PROFILE_{}_DEBUG=true\n",
-            profile.to_uppercase()
-        );
-    }
+    );
+    eprintln!("[profile.{}]", profile);
+    eprintln!("debug = true\n");
+    eprintln!("Or set this environment variable:\n");
+    eprintln!(
+        "CARGO_PROFILE_{}_DEBUG=true\n",
+        profile.to_uppercase()
+    );
 }
 
 fn select_executable(
-    opt: &Opt,
+    target: &VerifiedTarget,
     artifacts: &[Artifact],
 ) -> PathBuf {
-    let target = opt.target_name();
-    let kinds = opt.valid_target_kinds();
+    let kinds = &target.kind;
+    let name = &target.target;
 
     if artifacts.iter().all(|a| a.executable.is_none()) {
         eprintln!( "build artifacts do not contain any executable to profile");
@@ -314,11 +328,8 @@ fn select_executable(
     // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
     // If you know why, feel free to PR and handle kind properly.
     let artifact = artifacts.iter().find(|a| {
-        a.target.name == target
-            && a.target
-                .kind
-                .iter()
-                .any(|t| kinds.contains(&t.as_str()))
+        a.target.name == *name
+            && a.target.kind == *kinds
             && a.executable.is_some()
     });
 
@@ -329,14 +340,14 @@ fn select_executable(
             .collect();
         eprintln!(
             "could not find desired target {:?} \
-                 in the targets for this crate: {:?}",
-            (kinds, target),
+                 in the artifacts of this build: {:?}",
+            (kinds, name),
             targets
         );
         std::process::exit(1);
     });
 
-    check_debug_info(opt, artifact);
+    check_debug_info(target, artifact);
 
     artifact
         .executable
@@ -347,9 +358,10 @@ fn select_executable(
 
 fn workload(
     opt: &Opt,
+    target: &VerifiedTarget,
     artifacts: &[Artifact],
 ) -> Vec<String> {
-    let binary_path = select_executable(opt, artifacts);
+    let binary_path = select_executable(target, artifacts);
 
     let mut result = opt.trailing_arguments.clone();
     result.insert(0, binary_path.to_string_lossy().into());
@@ -357,12 +369,36 @@ fn workload(
 }
 
 #[derive(Clone, Debug)]
-struct BinaryTarget {
+struct VerifiedTarget {
     package: String,
     target: String,
+    kind: Vec<String>,
 }
 
-impl std::fmt::Display for BinaryTarget {
+impl VerifiedTarget {
+    fn is_kind(&self, kind: TargetKind) -> bool {
+        match kind {
+            TargetKind::Bin => {
+                self.kind.contains(&"bin".to_owned())
+            }
+            TargetKind::Example => {
+                self.kind.contains(&"example".to_owned())
+            }
+            TargetKind::Test => {
+                self.kind.contains(&"test".to_owned())
+            }
+            TargetKind::Bench => {
+                self.kind.contains(&"bench".to_owned())
+            }
+            TargetKind::UnitTest => {
+                self.kind.contains(&"bin".to_owned())
+                    || self.kind.contains(&"lib".to_owned())
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for VerifiedTarget {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter,
@@ -375,16 +411,14 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
-fn find_targets(
-    crate_kinds: &[String],
-) -> Vec<BinaryTarget> {
+fn find_targets() -> Vec<VerifiedTarget> {
     let mut metadata_command = MetadataCommand::new();
     metadata_command.no_deps();
     let metadata = metadata_command
         .exec()
         .expect("failed to access crate metadata");
 
-    let targets: Vec<BinaryTarget> = metadata
+    let targets: Vec<VerifiedTarget> = metadata
         .packages
         .into_iter()
         .flat_map(|p| {
@@ -393,31 +427,31 @@ fn find_targets(
                 .into_iter()
                 .map(move |t| (name.clone(), t))
         })
-        .filter(|(_, t)| {
-            crate_kinds
-                .iter()
-                .any(|kind| t.kind.contains(kind))
-        })
-        .map(|(p, t)| BinaryTarget {
+        .map(|(p, t)| VerifiedTarget {
             package: p,
             target: t.name,
+            kind: t.kind,
         })
         .collect();
 
     targets
 }
 
-fn find_unique_unit_test_target() -> BinaryTarget {
-    let allowed_kinds = ["bin".into(), "lib".into()];
-    let targets = find_targets(&allowed_kinds);
+fn find_unique_unit_test_target(
+    targets: &[VerifiedTarget],
+) -> &VerifiedTarget {
+    let unit_test_targets: Vec<_> = targets
+        .iter()
+        .filter(|t| t.is_kind(TargetKind::UnitTest))
+        .collect();
 
-    match targets.as_slice() {
+    match unit_test_targets.as_slice() {
         [target] => {
             eprintln!(
                 "automatically selected {} as it is the only unit test target",
                 target
             );
-            target.clone()
+            target
         }
         [] => {
             eprintln!(
@@ -431,16 +465,20 @@ fn find_unique_unit_test_target() -> BinaryTarget {
                 "several possible targets found: {:?}, \
                      please pass `--unit-test <target>` to cargo flamegraph \
                      to choose one of them",
-                targets
+                unit_test_targets
             );
             std::process::exit(1);
         }
     }
 }
 
-fn find_unique_bin_target() -> BinaryTarget {
-    let allowed_kinds = ["bin".into()];
-    let bin_targets = find_targets(&allowed_kinds);
+fn find_unique_bin_target(
+    targets: &[VerifiedTarget],
+) -> &VerifiedTarget {
+    let bin_targets: Vec<_> = targets
+        .iter()
+        .filter(|t| t.is_kind(TargetKind::Bin))
+        .collect();
 
     match bin_targets.as_slice() {
         [target] => {
@@ -448,7 +486,7 @@ fn find_unique_bin_target() -> BinaryTarget {
                 "automatically selected {} as it is the only binary target",
                 target
             );
-            target.clone()
+            target
         }
         [] => {
             eprintln!(
@@ -469,25 +507,55 @@ fn find_unique_bin_target() -> BinaryTarget {
     }
 }
 
+fn verify_explicit_target<'a>(
+    targets: &'a [VerifiedTarget],
+    opt: &Opt,
+) -> &'a VerifiedTarget {
+    let name = opt.target_name();
+    let kind = opt.kind();
+    let package = opt.package.as_ref();
+    let maybe_target = targets.iter().find(|t| {
+        let matching_package = package
+            .map(|p| t.package == *p)
+            .unwrap_or(true); // ignore package name if not given explicitly
+        matching_package
+            && t.target == name
+            && t.is_kind(kind)
+    });
+
+    match maybe_target {
+        Some(target) => target,
+        None => {
+            eprintln!("workspace does not contain target {} of kind {:?}{}",
+            name, kind, package.map(|p| format!(" in package {}", p)).unwrap_or_default(),
+        );
+            std::process::exit(1);
+        }
+    }
+}
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    if !opt.has_explicit_target() {
-        let BinaryTarget { target, package } =
-            find_unique_bin_target();
-        opt.bin = target.into();
-        opt.package = package.into();
-    }
+    let targets = find_targets();
 
-    if let Some(None) = opt.unit_test {
-        let BinaryTarget { target, package } =
-            find_unique_unit_test_target();
-        opt.unit_test = Some(target.into());
-        opt.package = package.into();
-    }
+    let target;
+    match (opt.has_explicit_target(), &opt.unit_test) {
+        (false, _) => {
+            target = find_unique_bin_target(&targets);
+            opt.bin = Some(target.target.clone());
+        }
+        (true, Some(None)) => {
+            target = find_unique_unit_test_target(&targets);
+            opt.unit_test =
+                Some(Some(target.target.clone()));
+        }
+        _ => {
+            target = verify_explicit_target(&targets, &opt)
+        }
+    };
 
-    let artifacts = build(&opt);
-    let workload = workload(&opt, &artifacts);
+    let artifacts = build(target, &opt);
+    let workload = workload(&opt, target, &artifacts);
 
     if opt.verbose {
         println!("workload: {:?}", workload);
