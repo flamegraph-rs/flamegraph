@@ -239,9 +239,6 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     !status.success()
 }
 
-// False positive in clippy for non-exhaustive struct FlamegraphOptions:
-// https://github.com/rust-lang/rust-clippy/issues/6559
-#[allow(clippy::field_reassign_with_default)]
 pub fn generate_flamegraph_for_workload<
     P: AsRef<std::path::Path>,
 >(
