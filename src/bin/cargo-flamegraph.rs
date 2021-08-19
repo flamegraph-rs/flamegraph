@@ -246,6 +246,9 @@ fn build(opt: BuildOpts) -> Vec<Artifact> {
             cmd.args(&["build", "--test", name]);
         }
         TargetKind::UnitTest => {
+            // `cargo test` is required because `cargo build` does not
+            // have flags to build individual unit test targets.
+            // `cargo test` requires differentiating between lib and bin.
             if opt.target.kind.contains(&"lib".to_owned()) {
                 cmd.args(&["test", "--no-run", "--lib"]);
             } else {
