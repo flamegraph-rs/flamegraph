@@ -118,7 +118,7 @@ struct Opt {
     )]
     custom_cmd: Option<String>,
 
-    /// Disable inlining for perf script because of performace issues
+    /// Disable inlining for perf script because of performance issues
     #[structopt(long = "no-inline")]
     script_no_inline: bool,
 
@@ -129,43 +129,71 @@ struct Opt {
 }
 
 impl Opt {
-    fn has_explicit_target(&self) -> bool {
-        self.bin.is_some()
-            || self.bench.is_some()
-            || self.example.is_some()
-            || self.test.is_some()
-            || self.unit_test.is_some()
-    }
-
-    fn kind(&self) -> TargetKind {
+    fn target(&self) -> Option<NamedTargetKind> {
+        use NamedTargetKind::*;
         match self {
-            Opt { bin: Some(_), .. } => TargetKind::Bin,
-            Opt {
-                example: Some(_), ..
-            } => TargetKind::Example,
-            Opt { test: Some(_), .. } => TargetKind::Test,
-            Opt { bench: Some(_), .. } => TargetKind::Bench,
-            Opt {
-                unit_test: Some(Some(_)),
-                ..
-            } => TargetKind::UnitTest,
-            _ => panic!("No target for profiling."),
-        }
-    }
-
-    fn target_name(&self) -> &str {
-        match self {
-            Opt { bin: Some(t), .. } => t,
+            Opt { bin: Some(t), .. } => Some(Bin(t)),
             Opt {
                 example: Some(t), ..
-            } => t,
-            Opt { test: Some(t), .. } => t,
-            Opt { bench: Some(t), .. } => t,
+            } => Some(Example(t)),
+            Opt { test: Some(t), .. } => Some(Test(t)),
+            Opt { bench: Some(t), .. } => Some(Bench(t)),
             Opt {
-                unit_test: Some(Some(t)),
-                ..
-            } => t,
-            _ => panic!("No target for profiling."),
+                unit_test: Some(t), ..
+            } => Some(UnitTest(t.as_deref())),
+            _ => None,
+        }
+    }
+}
+
+struct BuildOpts<'t> {
+    dev: bool,
+    target: &'t VerifiedTarget,
+    kind: TargetKind,
+    manifest_path: Option<PathBuf>,
+    features: Option<String>,
+    no_default_features: bool,
+    verbose: bool,
+}
+
+impl<'t> BuildOpts<'t> {
+    fn new(
+        opt: &mut Opt,
+        target: &'t VerifiedTarget,
+    ) -> Self {
+        Self {
+            dev: opt.dev,
+            target,
+            kind: opt
+                .target()
+                .map(Into::into)
+                .unwrap_or(TargetKind::Bin),
+            manifest_path: opt.manifest_path.take(),
+            features: opt.features.take(),
+            no_default_features: opt.no_default_features,
+            verbose: opt.verbose,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+enum NamedTargetKind<'a> {
+    Bin(&'a str),
+    Example(&'a str),
+    UnitTest(Option<&'a str>),
+    Test(&'a str),
+    Bench(&'a str),
+}
+
+impl NamedTargetKind<'_> {
+    fn target_name(&self) -> Option<&str> {
+        match *self {
+            NamedTargetKind::Bin(t) => t.into(),
+            NamedTargetKind::Example(t) => t.into(),
+            NamedTargetKind::UnitTest(Some(t)) => t.into(),
+            NamedTargetKind::UnitTest(_) => None,
+            NamedTargetKind::Test(t) => t.into(),
+            NamedTargetKind::Bench(t) => t.into(),
         }
     }
 }
@@ -180,7 +208,6 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-// TODO make OptTarget struct that contains target name, kind, crate kind for unit test,
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum TargetKind {
     Bin,
@@ -190,16 +217,25 @@ enum TargetKind {
     Bench,
 }
 
-fn build(
-    target: &VerifiedTarget,
-    opt: &Opt,
-) -> Vec<Artifact> {
+impl From<NamedTargetKind<'_>> for TargetKind {
+    fn from(f: NamedTargetKind) -> Self {
+        use NamedTargetKind::*;
+        match f {
+            Bin(_) => Self::Bin,
+            Example(_) => Self::Example,
+            UnitTest(_) => Self::UnitTest,
+            Test(_) => Self::Test,
+            Bench(_) => Self::Bench,
+        }
+    }
+}
+
+fn build(opt: BuildOpts) -> Vec<Artifact> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
-    let kind = opt.kind();
-    let name = &target.target;
-    match kind {
+    let name = &opt.target.target;
+    match opt.kind {
         TargetKind::Bin => {
             cmd.args(&["build", "--bin", name]);
         }
@@ -210,7 +246,7 @@ fn build(
             cmd.args(&["build", "--test", name]);
         }
         TargetKind::UnitTest => {
-            if target.kind.contains(&"lib".to_owned()) {
+            if opt.target.kind.contains(&"lib".to_owned()) {
                 cmd.args(&["test", "--no-run", "--lib"]);
             } else {
                 cmd.args(&[
@@ -230,11 +266,11 @@ fn build(
     }
 
     // do not use `--release` when we are building for `bench`
-    if !opt.dev && kind != TargetKind::Bench {
+    if !opt.dev && opt.kind != TargetKind::Bench {
         cmd.arg("--release");
     }
 
-    cmd.args(&["--package", &target.package]);
+    cmd.args(&["--package", &opt.target.package]);
 
     if let Some(ref manifest_path) = opt.manifest_path {
         cmd.arg("--manifest-path");
@@ -357,13 +393,13 @@ fn select_executable(
 }
 
 fn workload(
-    opt: &Opt,
+    trailing_arguments: Vec<String>,
     target: &VerifiedTarget,
     artifacts: &[Artifact],
 ) -> Vec<String> {
     let binary_path = select_executable(target, artifacts);
 
-    let mut result = opt.trailing_arguments.clone();
+    let mut result = trailing_arguments;
     result.insert(0, binary_path.to_string_lossy().into());
     result
 }
@@ -509,17 +545,18 @@ fn find_unique_bin_target(
 
 fn verify_explicit_target<'a>(
     targets: &'a [VerifiedTarget],
-    opt: &Opt,
+    kind: NamedTargetKind,
+    package: Option<&str>,
 ) -> &'a VerifiedTarget {
-    let name = opt.target_name();
-    let kind = opt.kind();
-    let package = opt.package.as_ref();
+    let target_name = kind
+        .target_name()
+        .expect("No explicit target to verify.");
+    let kind = kind.into();
     let maybe_target = targets.iter().find(|t| {
-        let matching_package = package
-            .map(|p| t.package == *p)
-            .unwrap_or(true); // ignore package name if not given explicitly
+        let matching_package =
+            package.map(|p| t.package == p).unwrap_or(true); // ignore package name if not given explicitly
         matching_package
-            && t.target == name
+            && t.target == target_name
             && t.is_kind(kind)
     });
 
@@ -527,7 +564,7 @@ fn verify_explicit_target<'a>(
         Some(target) => target,
         None => {
             eprintln!("workspace does not contain target {} of kind {:?}{}",
-            name, kind, package.map(|p| format!(" in package {}", p)).unwrap_or_default(),
+            target_name, kind, package.map(|p| format!(" in package {}", p)).unwrap_or_default(),
         );
             std::process::exit(1);
         }
@@ -537,25 +574,25 @@ fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
     let targets = find_targets();
-
-    let target;
-    match (opt.has_explicit_target(), &opt.unit_test) {
-        (false, _) => {
-            target = find_unique_bin_target(&targets);
-            opt.bin = Some(target.target.clone());
+    let target = match opt.target() {
+        None => find_unique_bin_target(&targets),
+        Some(NamedTargetKind::UnitTest(None)) => {
+            find_unique_unit_test_target(&targets)
         }
-        (true, Some(None)) => {
-            target = find_unique_unit_test_target(&targets);
-            opt.unit_test =
-                Some(Some(target.target.clone()));
-        }
-        _ => {
-            target = verify_explicit_target(&targets, &opt)
-        }
+        Some(kind) => verify_explicit_target(
+            &targets,
+            kind,
+            opt.package.as_deref(),
+        ),
     };
 
-    let artifacts = build(target, &opt);
-    let workload = workload(&opt, target, &artifacts);
+    let build_opts = BuildOpts::new(&mut opt, target);
+    let artifacts = build(build_opts);
+    let workload = workload(
+        std::mem::take(&mut opt.trailing_arguments),
+        target,
+        &artifacts,
+    );
 
     if opt.verbose {
         println!("workload: {:?}", workload);
