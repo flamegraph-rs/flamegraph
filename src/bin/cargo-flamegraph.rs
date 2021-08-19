@@ -432,6 +432,12 @@ impl VerifiedTarget {
             }
         }
     }
+
+    /// Returns true if the package name matches or `package` is None.
+    /// This allows ignoring the package if it's not given explicitly.
+    fn is_in_package(&self, package: Option<&str>) -> bool {
+        package.map_or(true, |p| p == self.package)
+    }
 }
 
 impl std::fmt::Display for VerifiedTarget {
@@ -473,12 +479,16 @@ fn find_targets() -> Vec<VerifiedTarget> {
     targets
 }
 
-fn find_unique_unit_test_target(
-    targets: &[VerifiedTarget],
-) -> &VerifiedTarget {
+fn find_unique_unit_test_target<'t>(
+    targets: &'t [VerifiedTarget],
+    package: Option<&str>,
+) -> &'t VerifiedTarget {
     let unit_test_targets: Vec<_> = targets
         .iter()
-        .filter(|t| t.is_kind(TargetKind::UnitTest))
+        .filter(|t| {
+            t.is_kind(TargetKind::UnitTest)
+                && t.is_in_package(package)
+        })
         .collect();
 
     match unit_test_targets.as_slice() {
@@ -508,12 +518,16 @@ fn find_unique_unit_test_target(
     }
 }
 
-fn find_unique_bin_target(
-    targets: &[VerifiedTarget],
-) -> &VerifiedTarget {
+fn find_unique_bin_target<'t>(
+    targets: &'t [VerifiedTarget],
+    package: Option<&str>,
+) -> &'t VerifiedTarget {
     let bin_targets: Vec<_> = targets
         .iter()
-        .filter(|t| t.is_kind(TargetKind::Bin))
+        .filter(|t| {
+            t.is_kind(TargetKind::Bin)
+                && t.is_in_package(package)
+        })
         .collect();
 
     match bin_targets.as_slice() {
@@ -543,19 +557,17 @@ fn find_unique_bin_target(
     }
 }
 
-fn verify_explicit_target<'a>(
-    targets: &'a [VerifiedTarget],
+fn verify_explicit_target<'t>(
+    targets: &'t [VerifiedTarget],
     kind: NamedTargetKind,
     package: Option<&str>,
-) -> &'a VerifiedTarget {
+) -> &'t VerifiedTarget {
     let target_name = kind
         .target_name()
         .expect("No explicit target to verify.");
     let kind = kind.into();
     let maybe_target = targets.iter().find(|t| {
-        let matching_package =
-            package.map(|p| t.package == p).unwrap_or(true); // ignore package name if not given explicitly
-        matching_package
+        t.is_in_package(package)
             && t.target == target_name
             && t.is_kind(kind)
     });
@@ -573,17 +585,16 @@ fn verify_explicit_target<'a>(
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
+    let package = opt.package.as_deref();
     let targets = find_targets();
     let target = match opt.target() {
-        None => find_unique_bin_target(&targets),
+        None => find_unique_bin_target(&targets, package),
         Some(NamedTargetKind::UnitTest(None)) => {
-            find_unique_unit_test_target(&targets)
+            find_unique_unit_test_target(&targets, package)
         }
-        Some(kind) => verify_explicit_target(
-            &targets,
-            kind,
-            opt.package.as_deref(),
-        ),
+        Some(kind) => {
+            verify_explicit_target(&targets, kind, package)
+        }
     };
 
     let build_opts = BuildOpts::new(&mut opt, target);
