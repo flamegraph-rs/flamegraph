@@ -218,65 +218,6 @@ fn build(opt: &Opt) -> Vec<Artifact> {
         })
         .collect();
 
-    if !opt.dev {
-        let messages = Message::parse_stream(&*stdout);
-
-        let mut has_debuginfo = false;
-
-        let profile = if opt.bench.is_some() {
-            "bench"
-        } else {
-            "release"
-        };
-
-        // get names of binaries in the workload
-        let workload_filenames = workload(opt, &artifacts)
-            .iter()
-            .filter_map(|w| {
-                PathBuf::from(w)
-                    .file_name()?
-                    .to_str()
-                    .map(|filename| filename.to_owned())
-            })
-            .collect::<Vec<_>>();
-
-        // This is an extremely coarse check to see
-        // if any of our build artifacts have debuginfo
-        // enabled.
-        for message in messages {
-            let artifact = if let Ok(cargo_metadata::Message::CompilerArtifact(artifact)) = message
-            {
-                artifact
-            } else {
-                continue;
-            };
-
-            // - Check that this is a binary we are interested in.
-            //   This should start with the target name (binaries can have names in format
-            //   `benchmark-deadbeef`)
-            // - The iterator is reversed because the entities we are interested in are most likely
-            //   to appear in the end of the list.
-            if workload_filenames
-                .iter()
-                .rev()
-                .any(|w| w.starts_with(&artifact.target.name))
-                && artifact.profile.debuginfo.unwrap_or(0) != 0
-            {
-                has_debuginfo = true;
-            }
-        }
-
-        if !has_debuginfo {
-            eprintln!(
-                "\nWARNING: building without debuginfo. \
-                 Enable symbol information by adding \
-                 the following lines to Cargo.toml:\n"
-            );
-            eprintln!("[profile.{}]", profile);
-            eprintln!("debug = true\n");
-        }
-    }
-
     if !status.success() {
         eprintln!("cargo build failed!");
         std::process::exit(1);
@@ -297,12 +238,13 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
 
         // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
         // If you know why, feel free to PR and handle kind properly.
-        artifacts
+        let (debug_level, executable) = artifacts
             .iter()
             .find_map(|a| {
                 a.executable
                     .as_deref()
                     .filter(|_| a.target.name == target && a.target.kind.contains(&kind))
+                    .map(|e| (a.profile.debuginfo, e))
             })
             .unwrap_or_else(|| {
                 let targets: Vec<_> = artifacts
@@ -315,7 +257,23 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
                     targets
                 );
                 std::process::exit(1);
-            })
+            });
+
+        const NONE: u32 = 0;
+        if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
+            let profile = match opt.bench {
+                Some(_) => "bench",
+                None => "release",
+            };
+
+            eprintln!("\nWARNING: profiling without debuginfo. Enable symbol information by adding the following lines to Cargo.toml:\n");
+            eprintln!("[profile.{}]", profile);
+            eprintln!("debug = true\n");
+            eprintln!("Or set this environment variable:\n");
+            eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
+        }
+
+        executable
     };
 
     let mut result = opt.trailing_arguments.clone();
