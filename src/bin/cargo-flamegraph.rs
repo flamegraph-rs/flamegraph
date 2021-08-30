@@ -1,6 +1,6 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
+use cargo_metadata::{Artifact, Message};
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -101,6 +101,36 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
+impl Opt {
+    fn has_explicit_target(&self) -> bool {
+        self.bin.is_some() || self.bench.is_some() || self.example.is_some() || self.test.is_some()
+    }
+
+    fn target_kind(&self) -> &'static str {
+        match self {
+            Opt { bin: Some(_), .. } => "bin",
+            Opt {
+                example: Some(_), ..
+            } => "example",
+            Opt { test: Some(_), .. } => "test",
+            Opt { bench: Some(_), .. } => "bench",
+            _ => panic!("No target for profiling."),
+        }
+    }
+
+    fn target_name(&self) -> &str {
+        match self {
+            Opt { bin: Some(t), .. } => t,
+            Opt {
+                example: Some(t), ..
+            } => t,
+            Opt { test: Some(t), .. } => t,
+            Opt { bench: Some(t), .. } => t,
+            _ => panic!("No target for profiling."),
+        }
+    }
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "cargo-flamegraph",
@@ -111,8 +141,9 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt) {
-    let mut cmd = std::process::Command::new("cargo");
+fn build(opt: &Opt) -> Vec<Artifact> {
+    use std::process::{Command, Output, Stdio};
+    let mut cmd = Command::new("cargo");
 
     // This will build benchmarks with the `bench` profile. This is needed
     // because the `--profile` argument for `cargo build` is unstable.
@@ -166,25 +197,29 @@ fn build(opt: &Opt) {
         cmd.arg("--no-default-features");
     }
 
+    cmd.arg("--message-format=json-render-diagnostics");
+
     if opt.verbose {
         println!("build command: {:?}", cmd);
     }
 
-    let mut child = cmd.spawn().expect("failed to spawn cargo build command");
+    let Output { status, stdout, .. } = cmd
+        .stderr(Stdio::inherit())
+        .output()
+        .expect("failed to execute cargo build command");
 
-    let exit_status = child
-        .wait()
-        .expect("failed to wait for cargo build child to finish");
+    let artifacts: Vec<_> = Message::parse_stream(&*stdout)
+        .filter_map(|m| match m {
+            Ok(Message::CompilerArtifact(artifact)) => Some(artifact),
+            Ok(_) => None,
+            Err(e) => {
+                panic!("failed to parse cargo build output: {:?}", e);
+            }
+        })
+        .collect();
 
     if !opt.dev {
-        cmd.arg("--message-format=json");
-
-        let output: Vec<u8> = cmd
-            .output()
-            .expect("failed to execute cargo build command")
-            .stdout;
-
-        let messages = cargo_metadata::Message::parse_stream(&*output);
+        let messages = Message::parse_stream(&*stdout);
 
         let mut has_debuginfo = false;
 
@@ -195,7 +230,7 @@ fn build(opt: &Opt) {
         };
 
         // get names of binaries in the workload
-        let workload_filenames = workload(opt)
+        let workload_filenames = workload(opt, &artifacts)
             .iter()
             .filter_map(|w| {
                 PathBuf::from(w)
@@ -242,111 +277,46 @@ fn build(opt: &Opt) {
         }
     }
 
-    if !exit_status.success() {
-        eprintln!("cargo build failed: {:?}", child.stderr);
-        std::process::exit(1);
-    }
-}
-
-fn find_binary<P: AsRef<Path>>(ty: &str, path: P, bin: &str) -> String {
-    // Ignorance-based error handling. We really do not care about any errors
-    // popping up from the filesystem search here. Thus, we just bash them into
-    // place using `Option`s monadic properties. Not pretty though.
-    fs::read_dir(path)
-        .ok()
-        .and_then(|mut r| {
-            r.find(|f| {
-                if let Ok(f) = f {
-                    let file_name = f.file_name();
-                    let name = file_name.to_string_lossy();
-                    name.starts_with(bin) && !name.ends_with(".d")
-                } else {
-                    false
-                }
-            })
-            .and_then(|r| r.ok())
-        })
-        .and_then(|f| {
-            f.path()
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-        })
-        .unwrap_or_else(|| {
-            eprintln!(
-                "could not find desired target {} \
-                 in the {} targets for this crate",
-                bin, ty
-            );
-            std::process::exit(1);
-        })
-}
-
-fn workload(opt: &Opt) -> Vec<String> {
-    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-    metadata_cmd.no_deps();
-    let metadata = metadata_cmd
-        .exec()
-        .expect("could not access crate metadata");
-
-    let mut binary_path = metadata.target_directory;
-
-    if let Ok(t) = std::env::var("CARGO_BUILD_TARGET") {
-        binary_path.push(t);
-    }
-
-    if opt.dev {
-        binary_path.push("debug");
-    } else {
-        binary_path.push("release");
-    }
-
-    if opt.example.is_some() {
-        binary_path.push("examples");
-    } else if opt.bench.is_some() {
-        binary_path.push("deps");
-    }
-
-    let targets: Vec<String> = metadata
-        .packages
-        .into_iter()
-        .flat_map(|p| p.targets)
-        .filter(|t| t.crate_types.contains(&"bin".into()))
-        .map(|t| t.name)
-        .collect();
-
-    if targets.is_empty() {
-        eprintln!("no Rust binary targets found");
+    if !status.success() {
+        eprintln!("cargo build failed!");
         std::process::exit(1);
     }
 
-    let target = if let Some(ref test) = opt.test {
-        find_binary("test", &binary_path, test)
-    } else if let Some(ref bench) = opt.bench {
-        find_binary("bench", &binary_path, bench)
-    } else if let Some(ref bin) = opt.bin.as_ref().or_else(|| opt.example.as_ref()) {
-        if targets.contains(&bin) {
-            bin.to_string()
-        } else {
-            eprintln!(
-                "could not find desired target {} \
-                 in the targets for this crate: {:?}",
-                bin, targets
-            );
+    artifacts
+}
+
+fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
+    let binary_path = {
+        let target = opt.target_name();
+        let kind = opt.target_kind().to_owned();
+
+        if artifacts.iter().all(|a| a.executable.is_none()) {
+            eprintln!("build artifacts do not contain any executable to profile");
             std::process::exit(1);
         }
-    } else if targets.len() == 1 {
-        targets[0].to_owned()
-    } else {
-        eprintln!(
-            "several possible targets found: {:?}, \
-             please pass `--bin <binary>` or `--example <example>` \
-             to cargo flamegraph to choose one of them",
-            targets
-        );
-        std::process::exit(1);
-    };
 
-    binary_path.push(target);
+        // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
+        // If you know why, feel free to PR and handle kind properly.
+        artifacts
+            .iter()
+            .find_map(|a| {
+                a.executable
+                    .as_deref()
+                    .filter(|_| a.target.name == target && a.target.kind.contains(&kind))
+            })
+            .unwrap_or_else(|| {
+                let targets: Vec<_> = artifacts
+                    .iter()
+                    .map(|a| (&a.target.kind, &a.target.name))
+                    .collect();
+                eprintln!(
+                    "could not find desired target {:?} in the targets for this crate: {:?}",
+                    (kind, target),
+                    targets
+                );
+                std::process::exit(1);
+            })
+    };
 
     let mut result = opt.trailing_arguments.clone();
     result.insert(0, binary_path.to_string());
@@ -356,9 +326,13 @@ fn workload(opt: &Opt) -> Vec<String> {
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    build(&opt);
+    if !opt.has_explicit_target() {
+        unimplemented!("select bin target.");
+    }
 
-    let workload = workload(&opt);
+    let artifacts = build(&opt);
+    let workload = workload(&opt, &artifacts);
+
     if opt.verbose {
         println!("workload: {:?}", workload);
     }
