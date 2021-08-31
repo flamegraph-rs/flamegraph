@@ -1,1 +1,0 @@
-status = ["build (ubuntu-latest)", "build (macOS-latest)", "build (windows-latest)", "lint" ]
