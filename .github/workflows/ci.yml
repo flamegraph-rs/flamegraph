@@ -26,8 +26,10 @@ jobs:
         profile: minimal
         toolchain: stable
         override: true
-    - name: Build
-      run: cargo build --verbose
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --all-targets
 
   lint:
     runs-on: ubuntu-latest
