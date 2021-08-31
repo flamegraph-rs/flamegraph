@@ -25,7 +25,7 @@ cargo_metadata = "0.11.3"
 opener = "0.5.0"
 
 [target.'cfg(unix)'.dependencies]
-signal-hook = "0.1.15"
+signal-hook = "0.3.10"
 
 [profile.release.build-override]
 opt-level = 0
