@@ -21,7 +21,7 @@ path = "src/bin/flamegraph.rs"
 [dependencies]
 inferno = "0.10.0"
 structopt = "0.3.14"
-cargo_metadata = "0.11.3"
+cargo_metadata = "0.14.0"
 opener = "0.5.0"
 
 [target.'cfg(unix)'.dependencies]
