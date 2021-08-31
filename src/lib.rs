@@ -9,14 +9,10 @@ use std::{
 use std::os::unix::process::ExitStatusExt;
 
 #[cfg(target_os = "linux")]
-use inferno::collapse::perf::{
-    Folder, Options as CollapseOptions,
-};
+use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 
 #[cfg(not(target_os = "linux"))]
-use inferno::collapse::dtrace::{
-    Folder, Options as CollapseOptions,
-};
+use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 
 use inferno::{
     collapse::Collapse,
@@ -34,8 +30,7 @@ mod arch {
     use super::*;
 
     pub const SPAWN_ERROR: &str = "could not spawn perf";
-    pub const WAIT_ERROR: &str =
-        "unable to wait for perf child command to exit";
+    pub const WAIT_ERROR: &str = "unable to wait for perf child command to exit";
 
     pub(crate) fn initial_command(
         workload: Workload,
@@ -43,8 +38,7 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> (Command, Option<String>) {
-        let perf = env::var("PERF")
-            .unwrap_or_else(|_| "perf".to_string());
+        let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
 
         let mut command = if sudo {
             let mut c = Command::new("sudo");
@@ -69,9 +63,7 @@ mod arch {
             // order to correctly compute perf's output in
             // `Self::output`.
             if arg == "-o" {
-                let next_arg = args
-                    .next()
-                    .expect("missing '-o' argument");
+                let next_arg = args.next().expect("missing '-o' argument");
                 command.arg(next_arg);
                 perf_output = Some(next_arg.to_string());
             }
@@ -90,12 +82,8 @@ mod arch {
         (command, perf_output)
     }
 
-    pub fn output(
-        perf_output: Option<String>,
-        script_no_inline: bool,
-    ) -> Vec<u8> {
-        let perf = env::var("PERF")
-            .unwrap_or_else(|_| "perf".to_string());
+    pub fn output(perf_output: Option<String>, script_no_inline: bool) -> Vec<u8> {
+        let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
         command.arg("script");
         if script_no_inline {
@@ -105,10 +93,7 @@ mod arch {
             command.arg("-i");
             command.arg(perf_output);
         }
-        command
-            .output()
-            .expect("unable to call perf script")
-            .stdout
+        command.output().expect("unable to call perf script").stdout
     }
 }
 
@@ -116,10 +101,8 @@ mod arch {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str =
-        "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str =
-        "unable to wait for dtrace \
+    pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
+    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace \
          child command to exit";
 
     pub(crate) fn initial_command(
@@ -128,8 +111,7 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
     ) -> (Command, Option<String>) {
-        let dtrace = env::var("DTRACE")
-            .unwrap_or_else(|_| "dtrace".to_string());
+        let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
 
         let mut command = if sudo {
             let mut c = Command::new("sudo");
@@ -161,8 +143,7 @@ mod arch {
                     if i > 0 {
                         escaped.push(' ');
                     }
-                    escaped
-                        .push_str(&arg.replace(" ", "\\ "));
+                    escaped.push_str(&arg.replace(" ", "\\ "));
                 }
 
                 command.arg("-c");
@@ -177,20 +158,16 @@ mod arch {
         (command, None)
     }
 
-    pub fn output(
-        _: Option<String>,
-        script_no_inline: bool,
-    ) -> Vec<u8> {
+    pub fn output(_: Option<String>, script_no_inline: bool) -> Vec<u8> {
         if script_no_inline {
             eprintln!("Option --no-inline is only supported on linux systems.");
             std::process::exit(1);
         }
         let mut buf = vec![];
-        let mut f = File::open("cargo-flamegraph.stacks")
-            .expect(
-                "failed to open dtrace output \
+        let mut f = File::open("cargo-flamegraph.stacks").expect(
+            "failed to open dtrace output \
                  file cargo-flamegraph.stacks",
-            );
+        );
 
         use std::io::Read;
         f.read_to_end(&mut buf).expect(
@@ -198,11 +175,10 @@ mod arch {
              output file cargo-flamegraph.stacks",
         );
 
-        std::fs::remove_file("cargo-flamegraph.stacks")
-            .expect(
-                "unable to remove cargo-flamegraph.stacks \
+        std::fs::remove_file("cargo-flamegraph.stacks").expect(
+            "unable to remove cargo-flamegraph.stacks \
                  temporary file",
-            );
+        );
 
         // Workaround #32 - fails parsing invalid utf8 dtrace output
         //
@@ -228,8 +204,7 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     status
         .signal() // the default needs to be true because that's the neutral element for `&&`
         .map_or(true, |code| {
-            code != signal_hook::SIGINT
-                && code != signal_hook::SIGTERM
+            code != signal_hook::SIGINT && code != signal_hook::SIGTERM
         })
         && !status.success()
 }
@@ -242,9 +217,7 @@ fn terminated_by_error(status: ExitStatus) -> bool {
 // False positive in clippy for non-exhaustive struct FlamegraphOptions:
 // https://github.com/rust-lang/rust-clippy/issues/6559
 #[allow(clippy::field_reassign_with_default)]
-pub fn generate_flamegraph_for_workload<
-    P: AsRef<std::path::Path>,
->(
+pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
     workload: Workload,
     flamegraph_filename: P,
     sudo: bool,
@@ -262,22 +235,17 @@ pub fn generate_flamegraph_for_workload<
     // process group).
     #[cfg(unix)]
     let handler = unsafe {
-        signal_hook::register(signal_hook::SIGINT, || {})
-            .expect("cannot register signal handler")
+        signal_hook::register(signal_hook::SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    let (mut command, perf_output) = arch::initial_command(
-        workload, sudo, freq, custom_cmd,
-    );
+    let (mut command, perf_output) = arch::initial_command(workload, sudo, freq, custom_cmd);
     if verbose {
         println!("command {:?}", command);
     }
 
-    let mut recorder =
-        command.spawn().expect(arch::SPAWN_ERROR);
+    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
 
-    let exit_status =
-        recorder.wait().expect(arch::WAIT_ERROR);
+    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
 
     #[cfg(unix)]
     signal_hook::unregister(handler);
@@ -291,8 +259,7 @@ pub fn generate_flamegraph_for_workload<
         std::process::exit(1);
     }
 
-    let output =
-        arch::output(perf_output, script_no_inline);
+    let output = arch::output(perf_output, script_no_inline);
 
     let perf_reader = BufReader::new(&*output);
 
@@ -304,30 +271,18 @@ pub fn generate_flamegraph_for_workload<
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
-        .expect(
-            "unable to collapse generated profile data",
-        );
+        .expect("unable to collapse generated profile data");
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    println!(
-        "writing flamegraph to {:?}",
-        flamegraph_filename.as_ref()
-    );
+    println!("writing flamegraph to {:?}", flamegraph_filename.as_ref());
 
-    let flamegraph_file = File::create(flamegraph_filename)
-        .expect(
-            "unable to create flamegraph.svg output file",
-        );
+    let flamegraph_file =
+        File::create(flamegraph_filename).expect("unable to create flamegraph.svg output file");
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
-    from_reader(
-        &mut flamegraph_options,
-        collapsed_reader,
-        flamegraph_writer,
-    )
-    .expect(
+    from_reader(&mut flamegraph_options, collapsed_reader, flamegraph_writer).expect(
         "unable to generate a flamegraph \
          from the collapsed stack data",
     );
@@ -336,10 +291,7 @@ pub fn generate_flamegraph_for_workload<
 #[derive(Debug, structopt::StructOpt)]
 pub struct FlamegraphOptions {
     /// Colors are selected such that the color of a function does not change between runs
-    #[structopt(
-        long = "deterministic",
-        conflicts_with = "hash"
-    )]
+    #[structopt(long = "deterministic", conflicts_with = "hash")]
     pub deterministic: bool,
 
     /// Plot the flame graph up-side-down
@@ -347,10 +299,7 @@ pub struct FlamegraphOptions {
     pub inverted: bool,
 
     /// Generate stack-reversed flame graph
-    #[structopt(
-        long = "reverse",
-        conflicts_with = "no-sort"
-    )]
+    #[structopt(long = "reverse", conflicts_with = "no-sort")]
     pub reverse: bool,
 
     /// Set embedded notes in SVG
@@ -381,15 +330,11 @@ pub struct FlamegraphOptions {
 }
 
 impl FlamegraphOptions {
-    pub fn into_inferno(
-        self,
-    ) -> inferno::flamegraph::Options<'static> {
-        let mut options =
-            inferno::flamegraph::Options::default();
+    pub fn into_inferno(self) -> inferno::flamegraph::Options<'static> {
+        let mut options = inferno::flamegraph::Options::default();
         options.deterministic = self.deterministic;
         if self.inverted {
-            options.direction =
-                inferno::flamegraph::Direction::Inverted;
+            options.direction = inferno::flamegraph::Direction::Inverted;
         }
         options.reverse_stack_order = self.reverse;
         options.notes = self.notes.unwrap_or_default();

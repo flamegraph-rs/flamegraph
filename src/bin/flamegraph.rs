@@ -10,11 +10,7 @@ use flamegraph::Workload;
 )]
 struct Opt {
     /// Output file, flamegraph.svg if not present
-    #[structopt(
-        parse(from_os_str),
-        short = "o",
-        long = "output"
-    )]
+    #[structopt(parse(from_os_str), short = "o", long = "output")]
     output: Option<PathBuf>,
 
     /// Open the output .svg file with default program
@@ -38,11 +34,7 @@ struct Opt {
     verbose: bool,
 
     /// Custom command for invoking perf/dtrace
-    #[structopt(
-        short = "c",
-        long = "cmd",
-        conflicts_with = "freq"
-    )]
+    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
     custom_cmd: Option<String>,
 
     /// Disable inlining for perf script because of performance issues
@@ -71,9 +63,7 @@ fn workload(opt: &Opt) -> Workload {
                 std::process::exit(1);
             }
 
-            Workload::Command(
-                opt.trailing_arguments.clone(),
-            )
+            Workload::Command(opt.trailing_arguments.clone())
         }
     }
 }
@@ -83,10 +73,7 @@ fn main() {
 
     let workload = workload(&opt);
 
-    let flamegraph_filename: PathBuf = opt
-        .output
-        .take()
-        .unwrap_or_else(|| "flamegraph.svg".into());
+    let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
 
     flamegraph::generate_flamegraph_for_workload(
         workload,
