@@ -3,12 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - master
-    - staging
-    - trying
+    - main
   pull_request:
     branches:
-    - master
+    - main
 
 jobs:
   build:
