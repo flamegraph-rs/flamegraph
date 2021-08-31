@@ -1,0 +1,4 @@
+[licenses]
+allow-osi-fsf-free = "either"
+copyleft = "warn"
+allow = ["CDDL-1.0"]
