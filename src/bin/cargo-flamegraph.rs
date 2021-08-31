@@ -60,11 +60,7 @@ struct Opt {
     manifest_path: Option<PathBuf>,
 
     /// Output file, flamegraph.svg if not present
-    #[structopt(
-        parse(from_os_str),
-        short = "o",
-        long = "output"
-    )]
+    #[structopt(parse(from_os_str), short = "o", long = "output")]
     output: Option<PathBuf>,
 
     /// Build features to enable
@@ -92,11 +88,7 @@ struct Opt {
     frequency: Option<u32>,
 
     /// Custom command for invoking perf/dtrace
-    #[structopt(
-        short = "c",
-        long = "cmd",
-        conflicts_with = "freq"
-    )]
+    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
     custom_cmd: Option<String>,
 
     /// Disable inlining for perf script because of performace issues
@@ -178,13 +170,11 @@ fn build(opt: &Opt) {
         println!("build command: {:?}", cmd);
     }
 
-    let mut child = cmd
-        .spawn()
-        .expect("failed to spawn cargo build command");
+    let mut child = cmd.spawn().expect("failed to spawn cargo build command");
 
-    let exit_status = child.wait().expect(
-        "failed to wait for cargo build child to finish",
-    );
+    let exit_status = child
+        .wait()
+        .expect("failed to wait for cargo build child to finish");
 
     if !opt.dev {
         cmd.arg("--message-format=json");
@@ -194,8 +184,7 @@ fn build(opt: &Opt) {
             .expect("failed to execute cargo build command")
             .stdout;
 
-        let messages =
-            cargo_metadata::Message::parse_stream(&*output);
+        let messages = cargo_metadata::Message::parse_stream(&*output);
 
         let mut has_debuginfo = false;
 
@@ -220,11 +209,7 @@ fn build(opt: &Opt) {
         // if any of our build artifacts have debuginfo
         // enabled.
         for message in messages {
-            let artifact = if let Ok(
-                cargo_metadata::Message::CompilerArtifact(
-                    artifact,
-                ),
-            ) = message
+            let artifact = if let Ok(cargo_metadata::Message::CompilerArtifact(artifact)) = message
             {
                 artifact
             } else {
@@ -236,10 +221,11 @@ fn build(opt: &Opt) {
             //   `benchmark-deadbeef`)
             // - The iterator is reversed because the entities we are interested in are most likely
             //   to appear in the end of the list.
-            if workload_filenames.iter().rev().any(|w| {
-                w.starts_with(&artifact.target.name)
-            }) && artifact.profile.debuginfo.unwrap_or(0)
-                != 0
+            if workload_filenames
+                .iter()
+                .rev()
+                .any(|w| w.starts_with(&artifact.target.name))
+                && artifact.profile.debuginfo.unwrap_or(0) != 0
             {
                 has_debuginfo = true;
             }
@@ -273,8 +259,7 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
                 if let Ok(f) = f {
                     let file_name = f.file_name();
                     let name = file_name.to_string_lossy();
-                    name.starts_with(bin)
-                        && !name.ends_with(".d")
+                    name.starts_with(bin) && !name.ends_with(".d")
                 } else {
                     false
                 }
@@ -297,8 +282,7 @@ fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
 }
 
 fn workload(opt: &Opt) -> Vec<String> {
-    let mut metadata_cmd =
-        cargo_metadata::MetadataCommand::new();
+    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
     let metadata = metadata_cmd
         .exec()
@@ -339,9 +323,7 @@ fn workload(opt: &Opt) -> Vec<String> {
         find_binary("test", &binary_path, test)
     } else if let Some(ref bench) = opt.bench {
         find_binary("bench", &binary_path, bench)
-    } else if let Some(ref bin) =
-        opt.bin.as_ref().or_else(|| opt.example.as_ref())
-    {
+    } else if let Some(ref bin) = opt.bin.as_ref().or_else(|| opt.example.as_ref()) {
         if targets.contains(&bin) {
             bin.to_string()
         } else {
@@ -381,10 +363,7 @@ fn main() {
         println!("workload: {:?}", workload);
     }
 
-    let flamegraph_filename: PathBuf = opt
-        .output
-        .take()
-        .unwrap_or_else(|| "flamegraph.svg".into());
+    let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
 
     flamegraph::generate_flamegraph_for_workload(
         Workload::Command(workload),
