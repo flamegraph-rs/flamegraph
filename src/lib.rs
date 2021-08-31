@@ -14,6 +14,9 @@ use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 #[cfg(not(target_os = "linux"))]
 use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 
+#[cfg(unix)]
+use signal_hook::consts::{SIGINT, SIGTERM};
+
 use inferno::{
     collapse::Collapse,
     flamegraph::color::Palette,
@@ -203,9 +206,7 @@ mod arch {
 fn terminated_by_error(status: ExitStatus) -> bool {
     status
         .signal() // the default needs to be true because that's the neutral element for `&&`
-        .map_or(true, |code| {
-            code != signal_hook::SIGINT && code != signal_hook::SIGTERM
-        })
+        .map_or(true, |code| code != SIGINT && code != SIGTERM)
         && !status.success()
 }
 
@@ -235,7 +236,7 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
     // process group).
     #[cfg(unix)]
     let handler = unsafe {
-        signal_hook::register(signal_hook::SIGINT, || {}).expect("cannot register signal handler")
+        signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
     let (mut command, perf_output) = arch::initial_command(workload, sudo, freq, custom_cmd);
@@ -248,7 +249,7 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
     let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
 
     #[cfg(unix)]
-    signal_hook::unregister(handler);
+    signal_hook::low_level::unregister(handler);
 
     // only stop if perf exited unsuccessfully, but
     // was not killed by a signal (assuming that the
