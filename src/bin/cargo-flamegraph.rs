@@ -248,7 +248,7 @@ fn build(opt: &Opt) {
     }
 }
 
-fn find_binary(ty: &str, path: &Path, bin: &str) -> String {
+fn find_binary<P: AsRef<Path>>(ty: &str, path: P, bin: &str) -> String {
     // Ignorance-based error handling. We really do not care about any errors
     // popping up from the filesystem search here. Thus, we just bash them into
     // place using `Option`s monadic properties. Not pretty though.
@@ -349,7 +349,7 @@ fn workload(opt: &Opt) -> Vec<String> {
     binary_path.push(target);
 
     let mut result = opt.trailing_arguments.clone();
-    result.insert(0, binary_path.to_string_lossy().into());
+    result.insert(0, binary_path.to_string());
     result
 }
 
