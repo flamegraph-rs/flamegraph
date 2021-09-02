@@ -221,12 +221,7 @@ fn terminated_by_error(status: ExitStatus) -> bool {
 pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
     workload: Workload,
     flamegraph_filename: P,
-    sudo: bool,
-    script_no_inline: bool,
-    freq: Option<u32>,
-    custom_cmd: Option<String>,
-    mut flamegraph_options: inferno::flamegraph::Options,
-    verbose: bool,
+    opts: Options,
 ) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -239,8 +234,9 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    let (mut command, perf_output) = arch::initial_command(workload, sudo, freq, custom_cmd);
-    if verbose {
+    let (mut command, perf_output) =
+        arch::initial_command(workload, opts.root, opts.frequency, opts.custom_cmd);
+    if opts.verbose {
         println!("command {:?}", command);
     }
 
@@ -260,7 +256,7 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
         std::process::exit(1);
     }
 
-    let output = arch::output(perf_output, script_no_inline)?;
+    let output = arch::output(perf_output, opts.script_no_inline)?;
 
     let perf_reader = BufReader::new(&*output);
 
@@ -283,8 +279,35 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
-    from_reader(&mut flamegraph_options, collapsed_reader, flamegraph_writer)
+    let mut inferno_opts = opts.flamegraph_options.into_inferno();
+    from_reader(&mut inferno_opts, collapsed_reader, flamegraph_writer)
         .context("unable to generate a flamegraph from the collapsed stack data")
+}
+
+#[derive(Debug, structopt::StructOpt)]
+pub struct Options {
+    /// Print extra output to help debug problems
+    #[structopt(short = "v", long = "verbose")]
+    pub verbose: bool,
+
+    /// Run with root privileges (using `sudo`)
+    #[structopt(long)]
+    root: bool,
+
+    /// Sampling frequency
+    #[structopt(short = "F", long = "freq")]
+    frequency: Option<u32>,
+
+    /// Custom command for invoking perf/dtrace
+    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
+    custom_cmd: Option<String>,
+
+    #[structopt(flatten)]
+    flamegraph_options: FlamegraphOptions,
+
+    /// Disable inlining for perf script because of performance issues
+    #[structopt(long = "no-inline")]
+    script_no_inline: bool,
 }
 
 #[derive(Debug, structopt::StructOpt)]

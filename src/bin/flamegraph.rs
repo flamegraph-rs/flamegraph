@@ -18,32 +18,12 @@ struct Opt {
     #[structopt(long = "open")]
     open: bool,
 
-    /// Run with root privileges (using `sudo`)
-    #[structopt(long = "root")]
-    root: bool,
-
     /// Profile a running process by pid
     #[structopt(short = "p", long = "pid")]
     pid: Option<u32>,
 
-    /// Sampling frequency
-    #[structopt(short = "F", long = "freq")]
-    frequency: Option<u32>,
-
-    /// Print extra output to help debug problems
-    #[structopt(short = "v", long = "verbose")]
-    verbose: bool,
-
-    /// Custom command for invoking perf/dtrace
-    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
-    custom_cmd: Option<String>,
-
-    /// Disable inlining for perf script because of performance issues
-    #[structopt(long = "no-inline")]
-    script_no_inline: bool,
-
     #[structopt(flatten)]
-    flamegraph_options: flamegraph::FlamegraphOptions,
+    graph: flamegraph::Options,
 
     trailing_arguments: Vec<String>,
 }
@@ -64,16 +44,7 @@ fn main() -> anyhow::Result<()> {
 
     let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
 
-    flamegraph::generate_flamegraph_for_workload(
-        workload,
-        &flamegraph_filename,
-        opt.root,
-        opt.script_no_inline,
-        opt.frequency,
-        opt.custom_cmd,
-        opt.flamegraph_options.into_inferno(),
-        opt.verbose,
-    )?;
+    flamegraph::generate_flamegraph_for_workload(workload, &flamegraph_filename, opt.graph)?;
 
     if opt.open {
         opener::open(&flamegraph_filename).context(format!(
