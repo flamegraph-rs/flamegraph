@@ -102,10 +102,6 @@ struct Opt {
 }
 
 impl Opt {
-    fn has_explicit_target(&self) -> bool {
-        self.bin.is_some() || self.bench.is_some() || self.example.is_some() || self.test.is_some()
-    }
-
     fn target_kind(&self) -> &'static str {
         match self {
             Opt { bin: Some(_), .. } => "bin",
@@ -338,7 +334,7 @@ fn find_unique_bin_target() -> BinaryTarget {
 fn main() {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    if !opt.has_explicit_target() {
+    if opt.bin.is_none() || opt.bench.is_none() || opt.example.is_none() || opt.test.is_none() {
         let BinaryTarget { target, package } = find_unique_bin_target();
         opt.bin = target.into();
         opt.package = package.into();
