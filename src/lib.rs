@@ -2,6 +2,7 @@ use std::{
     env,
     fs::File,
     io::{BufReader, BufWriter},
+    path::PathBuf,
     process::{Command, ExitStatus},
 };
 
@@ -218,10 +219,9 @@ fn terminated_by_error(status: ExitStatus) -> bool {
 // False positive in clippy for non-exhaustive struct FlamegraphOptions:
 // https://github.com/rust-lang/rust-clippy/issues/6559
 #[allow(clippy::field_reassign_with_default)]
-pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
+pub fn generate_flamegraph_for_workload(
     workload: Workload,
-    flamegraph_filename: P,
-    opts: Options,
+    mut opts: Options,
 ) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -272,16 +272,28 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    println!("writing flamegraph to {:?}", flamegraph_filename.as_ref());
-
-    let flamegraph_file =
-        File::create(flamegraph_filename).context("unable to create flamegraph.svg output file")?;
+    let flamegraph_filename: PathBuf = opts
+        .output
+        .take()
+        .unwrap_or_else(|| "flamegraph.svg".into());
+    println!("writing flamegraph to {:?}", flamegraph_filename);
+    let flamegraph_file = File::create(&flamegraph_filename)
+        .context("unable to create flamegraph.svg output file")?;
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
     let mut inferno_opts = opts.flamegraph_options.into_inferno();
     from_reader(&mut inferno_opts, collapsed_reader, flamegraph_writer)
-        .context("unable to generate a flamegraph from the collapsed stack data")
+        .context("unable to generate a flamegraph from the collapsed stack data")?;
+
+    if opts.open {
+        opener::open(&flamegraph_filename).context(format!(
+            "failed to open '{}'",
+            flamegraph_filename.display()
+        ))?;
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, structopt::StructOpt)]
@@ -289,6 +301,14 @@ pub struct Options {
     /// Print extra output to help debug problems
     #[structopt(short = "v", long = "verbose")]
     pub verbose: bool,
+
+    /// Output file, flamegraph.svg if not present
+    #[structopt(parse(from_os_str), short = "o", long = "output")]
+    output: Option<PathBuf>,
+
+    /// Open the output .svg file with default program
+    #[structopt(long = "open")]
+    open: bool,
 
     /// Run with root privileges (using `sudo`)
     #[structopt(long)]

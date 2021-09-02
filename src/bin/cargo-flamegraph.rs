@@ -60,10 +60,6 @@ struct Opt {
     #[structopt(long = "manifest-path")]
     manifest_path: Option<PathBuf>,
 
-    /// Output file, flamegraph.svg if not present
-    #[structopt(parse(from_os_str), short = "o", long = "output")]
-    output: Option<PathBuf>,
-
     /// Build features to enable
     #[structopt(short = "f", long = "features")]
     features: Option<String>,
@@ -71,10 +67,6 @@ struct Opt {
     /// Disable default features
     #[structopt(long = "no-default-features")]
     no_default_features: bool,
-
-    /// Open the output .svg file with default program
-    #[structopt(long = "open")]
-    open: bool,
 
     #[structopt(flatten)]
     graph: flamegraph::Options,
@@ -292,25 +284,5 @@ fn main() -> anyhow::Result<()> {
 
     let artifacts = build(&opt)?;
     let workload = workload(&opt, &artifacts)?;
-
-    if opt.graph.verbose {
-        println!("workload: {:?}", workload);
-    }
-
-    let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
-
-    flamegraph::generate_flamegraph_for_workload(
-        Workload::Command(workload),
-        &flamegraph_filename,
-        opt.graph,
-    )?;
-
-    if opt.open {
-        opener::open(&flamegraph_filename).context(format!(
-            "failed to open '{}'",
-            flamegraph_filename.display()
-        ))?;
-    }
-
-    Ok(())
+    flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph)
 }
