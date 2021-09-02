@@ -178,7 +178,12 @@ fn build(opt: &Opt) -> Vec<Artifact> {
         .output()
         .expect("failed to execute cargo build command");
 
-    let artifacts: Vec<_> = Message::parse_stream(&*stdout)
+    if !status.success() {
+        eprintln!("cargo build failed!");
+        std::process::exit(1);
+    }
+
+    Message::parse_stream(&*stdout)
         .filter_map(|m| match m {
             Ok(Message::CompilerArtifact(artifact)) => Some(artifact),
             Ok(_) => None,
@@ -186,17 +191,15 @@ fn build(opt: &Opt) -> Vec<Artifact> {
                 panic!("failed to parse cargo build output: {:?}", e);
             }
         })
-        .collect();
-
-    if !status.success() {
-        eprintln!("cargo build failed!");
-        std::process::exit(1);
-    }
-
-    artifacts
+        .collect()
 }
 
 fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
+    if artifacts.iter().all(|a| a.executable.is_none()) {
+        eprintln!("build artifacts do not contain any executable to profile");
+        std::process::exit(1);
+    }
+
     let (kind, target) = match opt {
         Opt { bin: Some(t), .. } => ("bin", t),
         Opt {
@@ -206,11 +209,6 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
         Opt { bench: Some(t), .. } => ("bench", t),
         _ => panic!("No target for profiling."),
     };
-
-    if artifacts.iter().all(|a| a.executable.is_none()) {
-        eprintln!("build artifacts do not contain any executable to profile");
-        std::process::exit(1);
-    }
 
     // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
     // If you know why, feel free to PR and handle kind properly.
