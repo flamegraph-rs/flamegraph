@@ -223,54 +223,50 @@ fn build(opt: &Opt) -> Vec<Artifact> {
 }
 
 fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
-    let binary_path = {
-        let target = opt.target_name();
-        let kind = opt.target_kind().to_owned();
+    let target = opt.target_name();
+    let kind = opt.target_kind().to_owned();
 
-        if artifacts.iter().all(|a| a.executable.is_none()) {
-            eprintln!("build artifacts do not contain any executable to profile");
+    if artifacts.iter().all(|a| a.executable.is_none()) {
+        eprintln!("build artifacts do not contain any executable to profile");
+        std::process::exit(1);
+    }
+
+    // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
+    // If you know why, feel free to PR and handle kind properly.
+    let (debug_level, binary_path) = artifacts
+        .iter()
+        .find_map(|a| {
+            a.executable
+                .as_deref()
+                .filter(|_| a.target.name == target && a.target.kind.contains(&kind))
+                .map(|e| (a.profile.debuginfo, e))
+        })
+        .unwrap_or_else(|| {
+            let targets: Vec<_> = artifacts
+                .iter()
+                .map(|a| (&a.target.kind, &a.target.name))
+                .collect();
+            eprintln!(
+                "could not find desired target {:?} in the targets for this crate: {:?}",
+                (kind, target),
+                targets
+            );
             std::process::exit(1);
-        }
+        });
 
-        // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
-        // If you know why, feel free to PR and handle kind properly.
-        let (debug_level, executable) = artifacts
-            .iter()
-            .find_map(|a| {
-                a.executable
-                    .as_deref()
-                    .filter(|_| a.target.name == target && a.target.kind.contains(&kind))
-                    .map(|e| (a.profile.debuginfo, e))
-            })
-            .unwrap_or_else(|| {
-                let targets: Vec<_> = artifacts
-                    .iter()
-                    .map(|a| (&a.target.kind, &a.target.name))
-                    .collect();
-                eprintln!(
-                    "could not find desired target {:?} in the targets for this crate: {:?}",
-                    (kind, target),
-                    targets
-                );
-                std::process::exit(1);
-            });
+    const NONE: u32 = 0;
+    if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
+        let profile = match opt.bench {
+            Some(_) => "bench",
+            None => "release",
+        };
 
-        const NONE: u32 = 0;
-        if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
-            let profile = match opt.bench {
-                Some(_) => "bench",
-                None => "release",
-            };
-
-            eprintln!("\nWARNING: profiling without debuginfo. Enable symbol information by adding the following lines to Cargo.toml:\n");
-            eprintln!("[profile.{}]", profile);
-            eprintln!("debug = true\n");
-            eprintln!("Or set this environment variable:\n");
-            eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
-        }
-
-        executable
-    };
+        eprintln!("\nWARNING: profiling without debuginfo. Enable symbol information by adding the following lines to Cargo.toml:\n");
+        eprintln!("[profile.{}]", profile);
+        eprintln!("debug = true\n");
+        eprintln!("Or set this environment variable:\n");
+        eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
+    }
 
     let mut result = opt.trailing_arguments.clone();
     result.insert(0, binary_path.to_string());
