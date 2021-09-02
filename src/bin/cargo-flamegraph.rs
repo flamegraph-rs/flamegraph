@@ -247,9 +247,10 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
         eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
     }
 
-    let mut result = opt.trailing_arguments.clone();
-    result.insert(0, binary_path.to_string());
-    result
+    let mut command = Vec::with_capacity(1 + opt.trailing_arguments.len());
+    command.push(binary_path.to_string());
+    command.extend(opt.trailing_arguments.iter().cloned());
+    command
 }
 
 #[derive(Clone, Debug)]
