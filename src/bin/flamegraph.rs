@@ -28,19 +28,14 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
-fn workload(opt: &Opt) -> anyhow::Result<Workload> {
-    match (opt.pid, opt.trailing_arguments.is_empty()) {
-        (Some(p), true) => Ok(Workload::Pid(p)),
-        (Some(_), false) => Err(anyhow!("cannot pass in command with --pid")),
-        (None, true) => Err(anyhow!("no workload given to generate a flamegraph for")),
-        (None, false) => Ok(Workload::Command(opt.trailing_arguments.clone())),
-    }
-}
-
 fn main() -> anyhow::Result<()> {
     let mut opt = Opt::from_args();
-
-    let workload = workload(&opt)?;
+    let workload = match (opt.pid, opt.trailing_arguments.is_empty()) {
+        (Some(p), true) => Workload::Pid(p),
+        (None, false) => Workload::Command(opt.trailing_arguments.clone()),
+        (Some(_), false) => return Err(anyhow!("cannot pass in command with --pid")),
+        (None, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+    };
 
     let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
 
