@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28ae2b3dec75a406790005a200b1bd89785afc02517a00ca99ecfe093ee9e6cf"
+
+[[package]]
 name = "arrayvec"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -166,6 +172,7 @@ dependencies = [
 name = "flamegraph"
 version = "0.4.0"
 dependencies = [
+ "anyhow",
  "cargo_metadata",
  "inferno",
  "opener",

@@ -17,6 +17,7 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
+use anyhow::Context;
 use inferno::{
     collapse::Collapse,
     flamegraph::color::Palette,
@@ -85,18 +86,24 @@ mod arch {
         (command, perf_output)
     }
 
-    pub fn output(perf_output: Option<String>, script_no_inline: bool) -> Vec<u8> {
+    pub fn output(perf_output: Option<String>, script_no_inline: bool) -> anyhow::Result<Vec<u8>> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
+
         command.arg("script");
         if script_no_inline {
             command.arg("--no-inline");
         }
+
         if let Some(perf_output) = perf_output {
             command.arg("-i");
             command.arg(perf_output);
         }
-        command.output().expect("unable to call perf script").stdout
+
+        Ok(command
+            .output()
+            .context("unable to call perf script")?
+            .stdout)
     }
 }
 
@@ -105,8 +112,7 @@ mod arch {
     use super::*;
 
     pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace \
-         child command to exit";
+    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace child command to exit";
 
     pub(crate) fn initial_command(
         workload: Workload,
@@ -161,27 +167,21 @@ mod arch {
         (command, None)
     }
 
-    pub fn output(_: Option<String>, script_no_inline: bool) -> Vec<u8> {
+    pub fn output(_: Option<String>, script_no_inline: bool) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
-            eprintln!("Option --no-inline is only supported on linux systems.");
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
         }
+
         let mut buf = vec![];
-        let mut f = File::open("cargo-flamegraph.stacks").expect(
-            "failed to open dtrace output \
-                 file cargo-flamegraph.stacks",
-        );
+        let mut f = File::open("cargo-flamegraph.stacks")
+            .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
 
         use std::io::Read;
-        f.read_to_end(&mut buf).expect(
-            "failed to read dtrace expected \
-             output file cargo-flamegraph.stacks",
-        );
+        f.read_to_end(&mut buf)
+            .context("failed to read dtrace expected output file 'cargo-flamegraph.stacks'")?;
 
-        std::fs::remove_file("cargo-flamegraph.stacks").expect(
-            "unable to remove cargo-flamegraph.stacks \
-                 temporary file",
-        );
+        std::fs::remove_file("cargo-flamegraph.stacks")
+            .context("unable to remove temporary file 'cargo-flamegraph.stacks'")?;
 
         // Workaround #32 - fails parsing invalid utf8 dtrace output
         //
@@ -198,7 +198,7 @@ mod arch {
             println!("Lossily converted invalid utf-8 found in cargo-flamegraph.stacks");
         }
 
-        reencoded_buf
+        Ok(reencoded_buf)
     }
 }
 
@@ -227,7 +227,7 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
     custom_cmd: Option<String>,
     mut flamegraph_options: inferno::flamegraph::Options,
     verbose: bool,
-) {
+) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
     // process under observation while we continue to
@@ -260,7 +260,7 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
         std::process::exit(1);
     }
 
-    let output = arch::output(perf_output, script_no_inline);
+    let output = arch::output(perf_output, script_no_inline)?;
 
     let perf_reader = BufReader::new(&*output);
 
@@ -272,21 +272,19 @@ pub fn generate_flamegraph_for_workload<P: AsRef<std::path::Path>>(
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
-        .expect("unable to collapse generated profile data");
+        .context("unable to collapse generated profile data")?;
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
     println!("writing flamegraph to {:?}", flamegraph_filename.as_ref());
 
     let flamegraph_file =
-        File::create(flamegraph_filename).expect("unable to create flamegraph.svg output file");
+        File::create(flamegraph_filename).context("unable to create flamegraph.svg output file")?;
 
     let flamegraph_writer = BufWriter::new(flamegraph_file);
 
-    from_reader(&mut flamegraph_options, collapsed_reader, flamegraph_writer).expect(
-        "unable to generate a flamegraph \
-         from the collapsed stack data",
-    );
+    from_reader(&mut flamegraph_options, collapsed_reader, flamegraph_writer)
+        .context("unable to generate a flamegraph from the collapsed stack data")
 }
 
 #[derive(Debug, structopt::StructOpt)]

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::{anyhow, Context};
 use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
 use structopt::StructOpt;
 
@@ -111,7 +112,7 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt) -> Vec<Artifact> {
+fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
@@ -176,28 +177,26 @@ fn build(opt: &Opt) -> Vec<Artifact> {
     let Output { status, stdout, .. } = cmd
         .stderr(Stdio::inherit())
         .output()
-        .expect("failed to execute cargo build command");
+        .context("failed to execute cargo build command")?;
 
     if !status.success() {
-        eprintln!("cargo build failed!");
-        std::process::exit(1);
+        return Err(anyhow!("cargo build failed"));
     }
 
     Message::parse_stream(&*stdout)
         .filter_map(|m| match m {
-            Ok(Message::CompilerArtifact(artifact)) => Some(artifact),
+            Ok(Message::CompilerArtifact(artifact)) => Some(Ok(artifact)),
             Ok(_) => None,
-            Err(e) => {
-                panic!("failed to parse cargo build output: {:?}", e);
-            }
+            Err(e) => Some(Err(e).context("failed to parse cargo build output")),
         })
         .collect()
 }
 
-fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
+fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
     if artifacts.iter().all(|a| a.executable.is_none()) {
-        eprintln!("build artifacts do not contain any executable to profile");
-        std::process::exit(1);
+        return Err(anyhow!(
+            "build artifacts do not contain any executable to profile"
+        ));
     }
 
     let (kind, target) = match opt {
@@ -207,7 +206,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
         } => ("example", t),
         Opt { test: Some(t), .. } => ("test", t),
         Opt { bench: Some(t), .. } => ("bench", t),
-        _ => panic!("No target for profiling."),
+        _ => return Err(anyhow!("no target for profiling")),
     };
 
     // `target.kind` is a `Vec`, but it always seems to contain exactly one element.
@@ -219,18 +218,17 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
                 .filter(|_| a.target.name == *target && a.target.kind.iter().any(|k| k == kind))
                 .map(|e| (a.profile.debuginfo, e))
         })
-        .unwrap_or_else(|| {
+        .ok_or_else(|| {
             let targets: Vec<_> = artifacts
                 .iter()
                 .map(|a| (&a.target.kind, &a.target.name))
                 .collect();
-            eprintln!(
+            anyhow!(
                 "could not find desired target {:?} in the targets for this crate: {:?}",
                 (kind, target),
                 targets
-            );
-            std::process::exit(1);
-        });
+            )
+        })?;
 
     const NONE: u32 = 0;
     if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
@@ -249,7 +247,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
     let mut command = Vec::with_capacity(1 + opt.trailing_arguments.len());
     command.push(binary_path.to_string());
     command.extend(opt.trailing_arguments.iter().cloned());
-    command
+    Ok(command)
 }
 
 #[derive(Clone, Debug)]
@@ -264,11 +262,11 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
-fn find_unique_bin_target() -> BinaryTarget {
+fn find_unique_bin_target() -> anyhow::Result<BinaryTarget> {
     let mut bin_targets: Vec<_> = MetadataCommand::new()
         .no_deps()
         .exec()
-        .expect("failed to access crate metadata")
+        .context("failed to access crate metadata")?
         .packages
         .into_iter()
         .flat_map(|p| {
@@ -289,34 +287,31 @@ fn find_unique_bin_target() -> BinaryTarget {
                 "automatically selected {} as it is the only binary target",
                 target
             );
-            target
+            Ok(target)
         }
-        [] => {
-            eprintln!("crate has no binary targets: try passing `--example <example>` or similar to choose a binary");
-            std::process::exit(1);
-        }
-        _ => {
-            eprintln!(
-                "several possible targets found: {:?}, please pass `--bin <binary>` or \
+        [] => Err(anyhow!(
+            "crate has no binary targets: try passing `--example <example>` \
+                or similar to choose a binary"
+        )),
+        _ => Err(anyhow!(
+            "several possible targets found: {:?}, please pass `--bin <binary>` or \
                 `--example <example>` to cargo flamegraph to choose one of them",
-                bin_targets
-            );
-            std::process::exit(1);
-        }
+            bin_targets
+        )),
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
     if opt.bin.is_none() || opt.bench.is_none() || opt.example.is_none() || opt.test.is_none() {
-        let BinaryTarget { target, package } = find_unique_bin_target();
+        let BinaryTarget { target, package } = find_unique_bin_target()?;
         opt.bin = Some(target);
         opt.package = Some(package);
     }
 
-    let artifacts = build(&opt);
-    let workload = workload(&opt, &artifacts);
+    let artifacts = build(&opt)?;
+    let workload = workload(&opt, &artifacts)?;
 
     if opt.verbose {
         println!("workload: {:?}", workload);
@@ -333,15 +328,14 @@ fn main() {
         opt.custom_cmd,
         opt.flamegraph_options.into_inferno(),
         opt.verbose,
-    );
+    )?;
 
     if opt.open {
-        if let Err(e) = opener::open(&flamegraph_filename) {
-            eprintln!(
-                "Failed to open [{}]. Error: {}",
-                flamegraph_filename.display(),
-                e
-            );
-        }
+        opener::open(&flamegraph_filename).context(format!(
+            "failed to open '{}'",
+            flamegraph_filename.display()
+        ))?;
     }
+
+    Ok(())
 }

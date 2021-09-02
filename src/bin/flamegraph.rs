@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::{anyhow, Context};
 use structopt::StructOpt;
 
 use flamegraph::Workload;
@@ -47,31 +48,19 @@ struct Opt {
     trailing_arguments: Vec<String>,
 }
 
-fn workload(opt: &Opt) -> Workload {
-    match opt.pid {
-        Some(p) => {
-            if !opt.trailing_arguments.is_empty() {
-                eprintln!("only a pid or command can be specified!");
-                std::process::exit(1);
-            }
-
-            Workload::Pid(p)
-        }
-        None => {
-            if opt.trailing_arguments.is_empty() {
-                eprintln!("no workload given to generate a flamegraph for!");
-                std::process::exit(1);
-            }
-
-            Workload::Command(opt.trailing_arguments.clone())
-        }
+fn workload(opt: &Opt) -> anyhow::Result<Workload> {
+    match (opt.pid, opt.trailing_arguments.is_empty()) {
+        (Some(p), true) => Ok(Workload::Pid(p)),
+        (Some(_), false) => Err(anyhow!("cannot pass in command with --pid")),
+        (None, true) => Err(anyhow!("no workload given to generate a flamegraph for")),
+        (None, false) => Ok(Workload::Command(opt.trailing_arguments.clone())),
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let mut opt = Opt::from_args();
 
-    let workload = workload(&opt);
+    let workload = workload(&opt)?;
 
     let flamegraph_filename: PathBuf = opt.output.take().unwrap_or_else(|| "flamegraph.svg".into());
 
@@ -84,15 +73,14 @@ fn main() {
         opt.custom_cmd,
         opt.flamegraph_options.into_inferno(),
         opt.verbose,
-    );
+    )?;
 
     if opt.open {
-        if let Err(e) = opener::open(&flamegraph_filename) {
-            eprintln!(
-                "Failed to open [{}]. Error: {}",
-                flamegraph_filename.display(),
-                e
-            );
-        }
+        opener::open(&flamegraph_filename).context(format!(
+            "failed to open '{}'",
+            flamegraph_filename.display()
+        ))?;
     }
+
+    Ok(())
 }
