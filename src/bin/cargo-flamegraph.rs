@@ -276,7 +276,7 @@ fn find_unique_bin_target() -> anyhow::Result<BinaryTarget> {
 fn main() -> anyhow::Result<()> {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    if opt.bin.is_none() || opt.bench.is_none() || opt.example.is_none() || opt.test.is_none() {
+    if opt.bin.is_none() && opt.bench.is_none() && opt.example.is_none() && opt.test.is_none() {
         let BinaryTarget { target, package } = find_unique_bin_target()?;
         opt.bin = Some(target);
         opt.package = Some(package);
