@@ -336,8 +336,8 @@ fn main() {
 
     if opt.bin.is_none() || opt.bench.is_none() || opt.example.is_none() || opt.test.is_none() {
         let BinaryTarget { target, package } = find_unique_bin_target();
-        opt.bin = target.into();
-        opt.package = package.into();
+        opt.bin = Some(target);
+        opt.package = Some(package);
     }
 
     let artifacts = build(&opt);
