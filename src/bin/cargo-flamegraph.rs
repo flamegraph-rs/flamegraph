@@ -299,7 +299,7 @@ fn find_unique_bin_target() -> BinaryTarget {
         .flat_map(|p| {
             let Package { targets, name, .. } = p;
             targets.into_iter().filter_map(move |t| {
-                t.kind.contains(&"bin".into()).then(|| BinaryTarget {
+                t.kind.iter().any(|s| s == "bin").then(|| BinaryTarget {
                     package: name.clone(),
                     target: t.name,
                 })
