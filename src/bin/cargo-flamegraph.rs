@@ -290,7 +290,7 @@ impl std::fmt::Display for BinaryTarget {
 }
 
 fn find_unique_bin_target() -> BinaryTarget {
-    let mut bin_targets: Vec<BinaryTarget> = MetadataCommand::new()
+    let mut bin_targets: Vec<_> = MetadataCommand::new()
         .no_deps()
         .exec()
         .expect("failed to access crate metadata")
