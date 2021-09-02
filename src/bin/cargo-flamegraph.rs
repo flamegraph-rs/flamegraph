@@ -76,28 +76,8 @@ struct Opt {
     #[structopt(long = "open")]
     open: bool,
 
-    /// Run with root privileges (using `sudo`)
-    #[structopt(long = "root")]
-    root: bool,
-
-    /// Print extra output to help debug problems
-    #[structopt(short = "v", long = "verbose")]
-    verbose: bool,
-
-    /// Sampling frequency
-    #[structopt(short = "F", long = "freq")]
-    frequency: Option<u32>,
-
-    /// Custom command for invoking perf/dtrace
-    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
-    custom_cmd: Option<String>,
-
-    /// Disable inlining for perf script because of performace issues
-    #[structopt(long = "no-inline")]
-    script_no_inline: bool,
-
     #[structopt(flatten)]
-    flamegraph_options: flamegraph::FlamegraphOptions,
+    graph: flamegraph::Options,
 
     trailing_arguments: Vec<String>,
 }
@@ -170,7 +150,7 @@ fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
 
     cmd.arg("--message-format=json-render-diagnostics");
 
-    if opt.verbose {
+    if opt.graph.verbose {
         println!("build command: {:?}", cmd);
     }
 
@@ -313,7 +293,7 @@ fn main() -> anyhow::Result<()> {
     let artifacts = build(&opt)?;
     let workload = workload(&opt, &artifacts)?;
 
-    if opt.verbose {
+    if opt.graph.verbose {
         println!("workload: {:?}", workload);
     }
 
@@ -322,12 +302,7 @@ fn main() -> anyhow::Result<()> {
     flamegraph::generate_flamegraph_for_workload(
         Workload::Command(workload),
         &flamegraph_filename,
-        opt.root,
-        opt.script_no_inline,
-        opt.frequency,
-        opt.custom_cmd,
-        opt.flamegraph_options.into_inferno(),
-        opt.verbose,
+        opt.graph,
     )?;
 
     if opt.open {
