@@ -210,8 +210,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> Vec<String> {
         _ => panic!("No target for profiling."),
     };
 
-    // target.kind is an array for some reason. No idea why though, it always seems to contain exactly one element.
-    // If you know why, feel free to PR and handle kind properly.
+    // `target.kind` is a `Vec`, but it always seems to contain exactly one element.
     let (debug_level, binary_path) = artifacts
         .iter()
         .find_map(|a| {
