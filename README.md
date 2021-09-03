@@ -33,6 +33,16 @@ This will make the `flamegraph` and
 binary directory. On most systems this is
 usually something like `~/.cargo/bin`.
 
+## Shell auto-completion
+
+At the moment, only `flamegraph` supports auto-completion. Supported shells are `bash`, `fish`, `zsh`, `powershell` and `elvish`.
+`cargo-flamegraph` does not support auto-completion because it is not as straight-forward to implement for custom cargo subcommands. See #153 for details.
+
+How you enable auto-completion depends on your shell, e.g.
+```bash
+flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_completion.d/
+```
+
 ## Examples
 
 ```

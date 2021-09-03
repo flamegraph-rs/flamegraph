@@ -12,6 +12,10 @@ struct Opt {
     #[structopt(short = "p", long = "pid")]
     pid: Option<u32>,
 
+    /// Generate shell completions for the given shell.
+    #[structopt(long = "completions")]
+    completions: Option<structopt::clap::Shell>,
+
     #[structopt(flatten)]
     graph: flamegraph::Options,
 
@@ -20,6 +24,12 @@ struct Opt {
 
 fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
+
+    if let Some(shell) = opt.completions {
+        Opt::clap().gen_completions_to("flamegraph", shell, &mut std::io::stdout().lock());
+        return Ok(());
+    }
+
     let workload = match (opt.pid, opt.trailing_arguments.is_empty()) {
         (Some(p), true) => Workload::Pid(p),
         (None, false) => Workload::Command(opt.trailing_arguments.clone()),
