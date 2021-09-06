@@ -13,7 +13,7 @@ struct Opt {
     pid: Option<u32>,
 
     /// Generate shell completions for the given shell.
-    #[structopt(long = "completions")]
+    #[structopt(long = "completions", conflicts_with = "pid")]
     completions: Option<structopt::clap::Shell>,
 
     #[structopt(flatten)]
@@ -26,8 +26,18 @@ fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
-        Opt::clap().gen_completions_to("flamegraph", shell, &mut std::io::stdout().lock());
-        return Ok(());
+        return match opt.trailing_arguments.is_empty() {
+            true => Ok(Opt::clap().gen_completions_to(
+                "flamegraph",
+                shell,
+                &mut std::io::stdout().lock(),
+            )),
+            false => {
+                return Err(anyhow!(
+                    "command arguments cannot be used with --completions <completions>"
+                ))
+            }
+        };
     }
 
     let workload = match (opt.pid, opt.trailing_arguments.is_empty()) {
