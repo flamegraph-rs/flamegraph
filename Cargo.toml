@@ -19,7 +19,7 @@ name = "flamegraph"
 path = "src/bin/flamegraph.rs"
 
 [dependencies]
-anyhow = "1.0.43"
+anyhow = "1.0.44"
 inferno = "0.10.0"
 structopt = "0.3.14"
 cargo_metadata = "0.14.0"
