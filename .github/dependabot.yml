@@ -6,3 +6,22 @@ updates:
     interval: weekly
     time: "13:00"
   open-pull-requests-limit: 99
+  ignore:
+  - dependency-name: anyhow
+    versions:
+    - "> 1.0.43, < 2"
+  - dependency-name: cargo_metadata
+    versions:
+    - "> 0.14.0, < 0.15"
+  - dependency-name: inferno
+    versions:
+    - "> 0.10.0, < 0.11"
+  - dependency-name: opener
+    versions:
+    - "> 0.5.0, < 0.6"
+  - dependency-name: signal-hook
+    versions:
+    - "> 0.3.10, < 0.4"
+  - dependency-name: structopt
+    versions:
+    - "> 0.3.14, < 0.4"
