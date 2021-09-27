@@ -50,7 +50,7 @@ struct Opt {
     )]
     test: Option<String>,
 
-    /// Crate target to unit test
+    /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
     /// (currently profiles the test harness and all tests in the binary; test selection
     /// can be passed as trailing arguments after `--` as separator)
     #[structopt(
@@ -60,7 +60,7 @@ struct Opt {
         conflicts_with = "test",
         conflicts_with = "example"
     )]
-    unit_test: Option<String>,
+    unit_test: Option<Option<String>>,
 
     /// Benchmark to run
     #[structopt(
@@ -199,7 +199,8 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         Opt { test: Some(t), .. } => (&["test"], t),
         Opt { bench: Some(t), .. } => (&["bench"], t),
         Opt {
-            unit_test: Some(t), ..
+            unit_test: Some(Some(t)),
+            ..
         } => (&["lib", "bin"], t),
         _ => return Err(anyhow!("no target for profiling")),
     };
@@ -260,8 +261,8 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
-fn find_unique_bin_target() -> anyhow::Result<BinaryTarget> {
-    let mut bin_targets: Vec<_> = MetadataCommand::new()
+fn find_unique_target(kind: &[&str]) -> anyhow::Result<BinaryTarget> {
+    let mut targets: Vec<_> = MetadataCommand::new()
         .no_deps()
         .exec()
         .context("failed to access crate metadata")?
@@ -270,31 +271,33 @@ fn find_unique_bin_target() -> anyhow::Result<BinaryTarget> {
         .flat_map(|p| {
             let Package { targets, name, .. } = p;
             targets.into_iter().filter_map(move |t| {
-                t.kind.iter().any(|s| s == "bin").then(|| BinaryTarget {
-                    package: name.clone(),
-                    target: t.name,
-                })
+                t.kind
+                    .iter()
+                    .any(|s| kind.contains(&s.as_str()))
+                    .then(|| BinaryTarget {
+                        package: name.clone(),
+                        target: t.name,
+                    })
             })
         })
         .collect();
 
-    match bin_targets.as_slice() {
+    match targets.as_slice() {
         [_] => {
-            let target = bin_targets.remove(0);
+            let target = targets.remove(0);
             eprintln!(
-                "automatically selected {} as it is the only binary target",
+                "automatically selected {} as it is the only valid target",
                 target
             );
             Ok(target)
         }
         [] => Err(anyhow!(
-            "crate has no binary targets: try passing `--example <example>` \
+            "crate has no automatically selectable target: try passing `--example <example>` \
                 or similar to choose a binary"
         )),
         _ => Err(anyhow!(
-            "several possible targets found: {:?}, please pass `--bin <binary>` or \
-                `--example <example>` to cargo flamegraph to choose one of them",
-            bin_targets
+            "several possible targets found: {:?}, please pass an explicit target.",
+            targets
         )),
     }
 }
@@ -308,8 +311,14 @@ fn main() -> anyhow::Result<()> {
         && opt.test.is_none()
         && opt.unit_test.is_none()
     {
-        let BinaryTarget { target, package } = find_unique_bin_target()?;
+        let BinaryTarget { target, package } = find_unique_target(&["bin"])?;
         opt.bin = Some(target);
+        opt.package = Some(package);
+    }
+
+    if opt.unit_test == Some(None) {
+        let BinaryTarget { target, package } = find_unique_target(&["bin", "lib"])?;
+        opt.unit_test = Some(Some(target));
         opt.package = Some(package);
     }
 
