@@ -24,6 +24,7 @@ struct Opt {
         short = "b",
         long = "bin",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -33,6 +34,7 @@ struct Opt {
     #[structopt(
         long = "example",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "test"
     )]
@@ -42,15 +44,29 @@ struct Opt {
     #[structopt(
         long = "test",
         conflicts_with = "bench",
+        conflicts_with = "unit-test",
         conflicts_with = "bin",
         conflicts_with = "example"
     )]
     test: Option<String>,
 
+    /// Crate target to unit test
+    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// can be passed as trailing arguments after `--` as separator)
+    #[structopt(
+        long = "unit-test",
+        conflicts_with = "bench",
+        conflicts_with = "bin",
+        conflicts_with = "test",
+        conflicts_with = "example"
+    )]
+    unit_test: Option<String>,
+
     /// Benchmark to run
     #[structopt(
         long = "bench",
         conflicts_with = "bin",
+        conflicts_with = "unit-test",
         conflicts_with = "example",
         conflicts_with = "test"
     )]
@@ -126,6 +142,10 @@ fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
         cmd.arg(bench);
     }
 
+    if opt.unit_test.is_some() {
+        cmd.arg("--tests");
+    }
+
     if let Some(ref manifest_path) = opt.manifest_path {
         cmd.arg("--manifest-path");
         cmd.arg(manifest_path);
@@ -171,13 +191,16 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         ));
     }
 
-    let (kind, target) = match opt {
-        Opt { bin: Some(t), .. } => ("bin", t),
+    let (kind, target): (&[&str], _) = match opt {
+        Opt { bin: Some(t), .. } => (&["bin"], t),
         Opt {
             example: Some(t), ..
-        } => ("example", t),
-        Opt { test: Some(t), .. } => ("test", t),
-        Opt { bench: Some(t), .. } => ("bench", t),
+        } => (&["example"], t),
+        Opt { test: Some(t), .. } => (&["test"], t),
+        Opt { bench: Some(t), .. } => (&["bench"], t),
+        Opt {
+            unit_test: Some(t), ..
+        } => (&["lib", "bin"], t),
         _ => return Err(anyhow!("no target for profiling")),
     };
 
@@ -187,7 +210,10 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         .find_map(|a| {
             a.executable
                 .as_deref()
-                .filter(|_| a.target.name == *target && a.target.kind.iter().any(|k| k == kind))
+                .filter(|_| {
+                    a.target.name == *target
+                        && a.target.kind.iter().any(|k| kind.contains(&k.as_str()))
+                })
                 .map(|e| (a.profile.debuginfo, e))
         })
         .ok_or_else(|| {
@@ -276,7 +302,12 @@ fn find_unique_bin_target() -> anyhow::Result<BinaryTarget> {
 fn main() -> anyhow::Result<()> {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    if opt.bin.is_none() && opt.bench.is_none() && opt.example.is_none() && opt.test.is_none() {
+    if opt.bin.is_none()
+        && opt.bench.is_none()
+        && opt.example.is_none()
+        && opt.test.is_none()
+        && opt.unit_test.is_none()
+    {
         let BinaryTarget { target, package } = find_unique_bin_target()?;
         opt.bin = Some(target);
         opt.package = Some(package);
