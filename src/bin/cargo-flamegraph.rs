@@ -101,7 +101,7 @@ enum Opts {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
+fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Vec<Artifact>> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
@@ -109,6 +109,8 @@ fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
     // because the `--profile` argument for `cargo build` is unstable.
     if !opt.dev && opt.bench.is_some() {
         cmd.args(&["bench", "--no-run"]);
+    } else if opt.unit_test.is_some() {
+        cmd.args(&["test", "--no-run"]);
     } else {
         cmd.arg("build");
     }
@@ -143,8 +145,11 @@ fn build(opt: &Opt) -> anyhow::Result<Vec<Artifact>> {
         cmd.arg(bench);
     }
 
-    if opt.unit_test.is_some() {
-        cmd.arg("--tests");
+    if let Some(Some(ref unit_test)) = opt.unit_test {
+        match kind.into_iter().any(|k| k == "lib") {
+            true => cmd.arg("--lib"),
+            false => cmd.args(&["--bin", unit_test]),
+        };
     }
 
     if let Some(ref manifest_path) = opt.manifest_path {
@@ -254,6 +259,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
 struct BinaryTarget {
     package: String,
     target: String,
+    kind: Vec<String>,
 }
 
 impl std::fmt::Display for BinaryTarget {
@@ -278,6 +284,7 @@ fn find_unique_target(kind: &[&str]) -> anyhow::Result<BinaryTarget> {
                     .then(|| BinaryTarget {
                         package: name.clone(),
                         target: t.name,
+                        kind: t.kind,
                     })
             })
         })
@@ -306,24 +313,26 @@ fn find_unique_target(kind: &[&str]) -> anyhow::Result<BinaryTarget> {
 fn main() -> anyhow::Result<()> {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
 
-    if opt.bin.is_none()
+    let kind = if opt.bin.is_none()
         && opt.bench.is_none()
         && opt.example.is_none()
         && opt.test.is_none()
         && opt.unit_test.is_none()
     {
-        let BinaryTarget { target, package } = find_unique_target(&["bin"])?;
-        opt.bin = Some(target);
-        opt.package = Some(package);
-    }
+        let target = find_unique_target(&["bin"])?;
+        opt.bin = Some(target.target);
+        opt.package = Some(target.package);
+        target.kind
+    } else if opt.unit_test == Some(None) {
+        let target = find_unique_target(&["bin", "lib"])?;
+        opt.unit_test = Some(Some(target.target));
+        opt.package = Some(target.package);
+        target.kind
+    } else {
+        Vec::new()
+    };
 
-    if opt.unit_test == Some(None) {
-        let BinaryTarget { target, package } = find_unique_target(&["bin", "lib"])?;
-        opt.unit_test = Some(Some(target));
-        opt.package = Some(package);
-    }
-
-    let artifacts = build(&opt)?;
+    let artifacts = build(&opt, kind)?;
     let workload = workload(&opt, &artifacts)?;
     flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph)
 }
