@@ -237,9 +237,10 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
 
     const NONE: u32 = 0;
     if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
-        let profile = match opt.bench {
-            Some(_) => "bench",
-            None => "release",
+        let profile = match opt.example.as_ref().or_else(|| opt.bin.as_ref()) {
+            Some(_) => "release",
+            // tests use the bench profile in release mode.
+            _ => "bench",
         };
 
         eprintln!("\nWARNING: profiling without debuginfo. Enable symbol information by adding the following lines to Cargo.toml:\n");
