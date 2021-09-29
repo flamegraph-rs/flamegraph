@@ -133,10 +133,13 @@ debug = true
 
 Or set the environment variable [CARGO_PROFILE_RELEASE_DEBUG=true](https://doc.rust-lang.org/cargo/reference/config.html#profilenamedebug).
 
+Please note that tests, unit tests and benchmarks use the `bench` profile in release mode (see [here](https://doc.rust-lang.org/cargo/reference/profiles.html#profile-selection)).
+
+
 ## Usage with benchmarks
 
 In order to perf existing benchmarks, you should set up a few configs.
-Set the following in your `Cargo.toml` file to run benchmarks(flamegraph will still complain about not setting one):
+Set the following in your `Cargo.toml` file to run benchmarks:
 
 ```
 [profile.bench]
