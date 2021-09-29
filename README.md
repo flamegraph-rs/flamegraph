@@ -36,7 +36,7 @@ usually something like `~/.cargo/bin`.
 ## Shell auto-completion
 
 At the moment, only `flamegraph` supports auto-completion. Supported shells are `bash`, `fish`, `zsh`, `powershell` and `elvish`.
-`cargo-flamegraph` does not support auto-completion because it is not as straight-forward to implement for custom cargo subcommands. See #153 for details.
+`cargo-flamegraph` does not support auto-completion because it is not as straight-forward to implement for custom cargo subcommands. See [#153](https://github.com/flamegraph-rs/flamegraph/pull/153) for details.
 
 How you enable auto-completion depends on your shell, e.g.
 ```bash
