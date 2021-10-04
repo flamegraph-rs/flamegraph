@@ -15,6 +15,8 @@ flamegraph generation library!
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
+**Note**: On Linux, perf will not create accurate stack traces if the program was linked with lld. Link with the default binutils linker instead.
+
 ## Installation
 
 Requirements on Linux (Ubuntu/Debian):
