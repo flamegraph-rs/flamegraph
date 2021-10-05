@@ -15,7 +15,7 @@ flamegraph generation library!
 
 Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
 
-**Note**: If you're using lld on on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces. For example
+**Note**: If you're using lld on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example
 
 ```toml
 [target.x86_64-unknown-linux-gnu]
