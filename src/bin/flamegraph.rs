@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::anyhow;
 use structopt::StructOpt;
 
@@ -18,6 +20,9 @@ struct Opt {
 
     #[structopt(flatten)]
     graph: flamegraph::Options,
+
+    #[structopt(parse(from_os_str), long = "perfdata", conflicts_with = "pid")]
+    perf_file: Option<PathBuf>,
 
     trailing_arguments: Vec<String>,
 }
@@ -41,11 +46,16 @@ fn main() -> anyhow::Result<()> {
 
     opt.graph.check()?;
 
-    let workload = match (opt.pid, opt.trailing_arguments.is_empty()) {
-        (Some(p), true) => Workload::Pid(p),
-        (None, false) => Workload::Command(opt.trailing_arguments.clone()),
-        (Some(_), false) => return Err(anyhow!("cannot pass in command with --pid")),
-        (None, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+    let workload = if let Some(perf_file) = opt.perf_file {
+        let path = perf_file.to_str().unwrap();
+        Workload::ReadPerf(path.to_string())
+    } else {
+        match (opt.pid, opt.trailing_arguments.is_empty()) {
+            (Some(p), true) => Workload::Pid(p),
+            (None, false) => Workload::Command(opt.trailing_arguments.clone()),
+            (Some(_), false) => return Err(anyhow!("cannot pass in command with --pid")),
+            (None, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+        }
     };
     flamegraph::generate_flamegraph_for_workload(workload, opt.graph)
 }
