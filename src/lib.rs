@@ -28,6 +28,7 @@ use inferno::{
 pub enum Workload {
     Command(Vec<String>),
     Pid(u32),
+    ReadPerf(String),
 }
 
 #[cfg(target_os = "linux")]
@@ -82,6 +83,7 @@ mod arch {
                 command.arg("-p");
                 command.arg(p.to_string());
             }
+            Workload::ReadPerf(_) => (),
         }
 
         (command, perf_output)
@@ -163,6 +165,7 @@ mod arch {
                 command.arg("-p");
                 command.arg(p.to_string());
             }
+            Workload::ReadPerf(_) => (),
         }
 
         (command, None)
@@ -231,27 +234,31 @@ pub fn generate_flamegraph_for_workload(
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    let (mut command, perf_output) =
-        arch::initial_command(workload, opts.root, opts.frequency, opts.custom_cmd);
-    if opts.verbose {
-        println!("command {:?}", command);
-    }
+    let perf_output = if let Workload::ReadPerf(perf_file) = workload {
+        Some(perf_file)
+    } else {
+        let (mut command, perf_output) =
+            arch::initial_command(workload, opts.root, opts.frequency, opts.custom_cmd);
+        if opts.verbose {
+            println!("command {:?}", command);
+        }
 
-    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
+        let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
 
-    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
+        let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
 
-    #[cfg(unix)]
-    signal_hook::low_level::unregister(handler);
-
-    // only stop if perf exited unsuccessfully, but
-    // was not killed by a signal (assuming that the
-    // latter case usually means the user interrupted
-    // it in some way)
-    if terminated_by_error(exit_status) {
-        eprintln!("failed to sample program");
-        std::process::exit(1);
-    }
+        #[cfg(unix)]
+        signal_hook::low_level::unregister(handler);
+        // only stop if perf exited unsuccessfully, but
+        // was not killed by a signal (assuming that the
+        // latter case usually means the user interrupted
+        // it in some way)
+        if terminated_by_error(exit_status) {
+            eprintln!("failed to sample program");
+            std::process::exit(1);
+        }
+        perf_output
+    };
 
     let output = arch::output(perf_output, opts.script_no_inline)?;
 
