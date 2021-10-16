@@ -27,11 +27,10 @@ fn main() -> anyhow::Result<()> {
 
     if let Some(shell) = opt.completions {
         return match opt.trailing_arguments.is_empty() {
-            true => Ok(Opt::clap().gen_completions_to(
-                "flamegraph",
-                shell,
-                &mut std::io::stdout().lock(),
-            )),
+            true => {
+                Opt::clap().gen_completions_to("flamegraph", shell, &mut std::io::stdout().lock());
+                Ok(())
+            }
             false => {
                 return Err(anyhow!(
                     "command arguments cannot be used with --completions <completions>"
