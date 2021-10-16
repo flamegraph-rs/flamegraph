@@ -18,7 +18,7 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use inferno::{
     collapse::Collapse,
     flamegraph::color::Palette,
@@ -316,7 +316,7 @@ pub struct Options {
     frequency: Option<u32>,
 
     /// Custom command for invoking perf/dtrace
-    #[structopt(short = "c", long = "cmd", conflicts_with = "freq")]
+    #[structopt(short = "c", long = "cmd")]
     custom_cmd: Option<String>,
 
     #[structopt(flatten)]
@@ -325,6 +325,19 @@ pub struct Options {
     /// Disable inlining for perf script because of performance issues
     #[structopt(long = "no-inline")]
     script_no_inline: bool,
+}
+
+impl Options {
+    pub fn check(&self) -> anyhow::Result<()> {
+        // Manually checking conflict because structopts `conflicts_with` leads
+        // to a panic in completion generation for zsh at the moment (see #158)
+        match self.frequency.is_some() && self.custom_cmd.is_some() {
+            true => Err(anyhow!(
+                "Cannot pass both a custom command and a frequency."
+            )),
+            false => Ok(()),
+        }
+    }
 }
 
 #[derive(Debug, structopt::StructOpt)]

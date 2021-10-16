@@ -314,6 +314,7 @@ fn find_unique_target(kind: &[&str], pkg: Option<&str>) -> anyhow::Result<Binary
 
 fn main() -> anyhow::Result<()> {
     let Opts::Flamegraph(mut opt) = Opts::from_args();
+    opt.graph.check()?;
 
     let kind = if opt.bin.is_none()
         && opt.bench.is_none()
