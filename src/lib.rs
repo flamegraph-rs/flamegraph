@@ -330,7 +330,7 @@ pub struct Options {
 #[derive(Debug, structopt::StructOpt)]
 pub struct FlamegraphOptions {
     /// Colors are selected such that the color of a function does not change between runs
-    #[structopt(long = "deterministic", conflicts_with = "hash")]
+    #[structopt(long = "deterministic")]
     pub deterministic: bool,
 
     /// Plot the flame graph up-side-down
@@ -338,7 +338,7 @@ pub struct FlamegraphOptions {
     pub inverted: bool,
 
     /// Generate stack-reversed flame graph
-    #[structopt(long = "reverse", conflicts_with = "no-sort")]
+    #[structopt(long = "reverse")]
     pub reverse: bool,
 
     /// Set embedded notes in SVG
