@@ -40,6 +40,8 @@ fn main() -> anyhow::Result<()> {
         };
     }
 
+    opt.graph.check()?;
+
     let workload = match (opt.pid, opt.trailing_arguments.is_empty()) {
         (Some(p), true) => Workload::Pid(p),
         (None, false) => Workload::Command(opt.trailing_arguments.clone()),
