@@ -27,5 +27,8 @@ structopt = "0.3.14"
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"
 
+[target.'cfg(windows)'.dependencies]
+regex = "1.5.4"
+
 [profile.release.build-override]
 opt-level = 0

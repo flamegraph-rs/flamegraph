@@ -6,6 +6,9 @@ use std::{
     process::{Command, ExitStatus},
 };
 
+#[cfg(windows)]
+use regex::Regex;
+
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 
@@ -69,7 +72,7 @@ mod arch {
             // `Self::output`.
             if arg == "-o" {
                 let next_arg = args.next().expect("missing '-o' argument");
-                command.arg(next_arg);
+               command.arg(next_arg);
                 perf_output = Some(next_arg.to_string());
             }
         }
@@ -131,9 +134,22 @@ mod arch {
             Command::new(dtrace)
         };
 
+        #[cfg(not(windows))]
         let dtrace_script = custom_cmd.unwrap_or(format!(
             "profile-{} /pid == $target/ \
              {{ @[ustack(100)] = count(); }}",
+            freq.unwrap_or(997)
+        ));
+
+        #[cfg(windows)]
+        let dtrace_script = custom_cmd.unwrap_or(format!(
+            "profile-{} /pid == $target/ \
+             {{ @[ustack(100)] = count(); }} \
+             syscall::NtTerminateProcess:return \
+             /pid == $target/ \
+             {{ \
+                 exit(0) \
+             }}",
             freq.unwrap_or(997)
         ));
 
@@ -142,7 +158,7 @@ mod arch {
 
         command.arg("-n");
         command.arg(&dtrace_script);
-
+      
         command.arg("-o");
         command.arg("cargo-flamegraph.stacks");
 
@@ -175,13 +191,13 @@ mod arch {
 
         let mut buf = vec![];
         let mut f = File::open("cargo-flamegraph.stacks")
-            .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
+        .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
 
         use std::io::Read;
         f.read_to_end(&mut buf)
             .context("failed to read dtrace expected output file 'cargo-flamegraph.stacks'")?;
 
-        std::fs::remove_file("cargo-flamegraph.stacks")
+            std::fs::remove_file("cargo-flamegraph.stacks")
             .context("unable to remove temporary file 'cargo-flamegraph.stacks'")?;
 
         // Workaround #32 - fails parsing invalid utf8 dtrace output
@@ -199,8 +215,21 @@ mod arch {
             println!("Lossily converted invalid utf-8 found in cargo-flamegraph.stacks");
         }
 
+        #[cfg(windows)]
+        let reencoded_buf = delete_falty_values(&buf);
+
         Ok(reencoded_buf)
     }
+}
+
+
+// Windows unexpectidly generate integer values without any associated function call, resulting in an error in inferno
+#[cfg(windows)]
+fn delete_falty_values(buf :&Vec<u8>) -> Vec<u8>{
+    let regex = Regex::new(r"(?P<value>\r\n[ ]*[0-9]+[ ]*\r\n)[\r\n]*[ ]*[0-9]+[ ]*\r\n").unwrap();
+    let string = String::from_utf8_lossy(&buf);
+    let cleaned_string = regex.replace_all(&string,"$value");
+    cleaned_string.as_bytes().to_owned()
 }
 
 #[cfg(unix)]
@@ -283,29 +312,29 @@ pub fn generate_flamegraph_for_workload(
     from_reader(&mut inferno_opts, collapsed_reader, flamegraph_writer)
         .context("unable to generate a flamegraph from the collapsed stack data")?;
 
-    if opts.open {
-        opener::open(&flamegraph_filename).context(format!(
-            "failed to open '{}'",
-            flamegraph_filename.display()
-        ))?;
+        if opts.open {
+            opener::open(&flamegraph_filename).context(format!(
+                "failed to open '{}'",
+                flamegraph_filename.display()
+            ))?;
+        }
+        
+        Ok(())
     }
-
-    Ok(())
-}
-
-#[derive(Debug, structopt::StructOpt)]
-pub struct Options {
-    /// Print extra output to help debug problems
-    #[structopt(short = "v", long = "verbose")]
-    pub verbose: bool,
-
-    /// Output file, flamegraph.svg if not present
-    #[structopt(parse(from_os_str), short = "o", long = "output")]
-    output: Option<PathBuf>,
-
-    /// Open the output .svg file with default program
-    #[structopt(long = "open")]
-    open: bool,
+    
+    #[derive(Debug, structopt::StructOpt)]
+    pub struct Options {
+        /// Print extra output to help debug problems
+        #[structopt(short = "v", long = "verbose")]
+        pub verbose: bool,
+    
+        /// Output file, flamegraph.svg if not present
+        #[structopt(parse(from_os_str), short = "o", long = "output")]
+        output: Option<PathBuf>,
+    
+        /// Open the output .svg file with default program
+        #[structopt(long = "open")]
+        open: bool,
 
     /// Run with root privileges (using `sudo`)
     #[structopt(long)]
