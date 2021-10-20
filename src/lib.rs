@@ -322,19 +322,19 @@ pub fn generate_flamegraph_for_workload(
     Ok(())
 }
     
-    #[derive(Debug, structopt::StructOpt)]
-    pub struct Options {
-        /// Print extra output to help debug problems
-        #[structopt(short = "v", long = "verbose")]
-        pub verbose: bool,
-    
-        /// Output file, flamegraph.svg if not present
-        #[structopt(parse(from_os_str), short = "o", long = "output")]
-        output: Option<PathBuf>,
-    
-        /// Open the output .svg file with default program
-        #[structopt(long = "open")]
-        open: bool,
+#[derive(Debug, structopt::StructOpt)]
+pub struct Options {
+    /// Print extra output to help debug problems
+    #[structopt(short = "v", long = "verbose")]
+    pub verbose: bool,
+
+    /// Output file, flamegraph.svg if not present
+    #[structopt(parse(from_os_str), short = "o", long = "output")]
+    output: Option<PathBuf>,
+
+    /// Open the output .svg file with default program
+    #[structopt(long = "open")]
+    open: bool,
 
     /// Run with root privileges (using `sudo`)
     #[structopt(long)]
