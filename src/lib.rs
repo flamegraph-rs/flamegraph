@@ -72,7 +72,7 @@ mod arch {
             // `Self::output`.
             if arg == "-o" {
                 let next_arg = args.next().expect("missing '-o' argument");
-               command.arg(next_arg);
+                command.arg(next_arg);
                 perf_output = Some(next_arg.to_string());
             }
         }
@@ -158,7 +158,7 @@ mod arch {
 
         command.arg("-n");
         command.arg(&dtrace_script);
-      
+
         command.arg("-o");
         command.arg("cargo-flamegraph.stacks");
 
@@ -191,13 +191,13 @@ mod arch {
 
         let mut buf = vec![];
         let mut f = File::open("cargo-flamegraph.stacks")
-        .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
+            .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
 
         use std::io::Read;
         f.read_to_end(&mut buf)
             .context("failed to read dtrace expected output file 'cargo-flamegraph.stacks'")?;
 
-            std::fs::remove_file("cargo-flamegraph.stacks")
+        std::fs::remove_file("cargo-flamegraph.stacks")
             .context("unable to remove temporary file 'cargo-flamegraph.stacks'")?;
 
         // Workaround #32 - fails parsing invalid utf8 dtrace output
@@ -312,15 +312,15 @@ pub fn generate_flamegraph_for_workload(
     from_reader(&mut inferno_opts, collapsed_reader, flamegraph_writer)
         .context("unable to generate a flamegraph from the collapsed stack data")?;
 
-        if opts.open {
-            opener::open(&flamegraph_filename).context(format!(
-                "failed to open '{}'",
-                flamegraph_filename.display()
-            ))?;
-        }
-        
-        Ok(())
+    if opts.open {
+        opener::open(&flamegraph_filename).context(format!(
+            "failed to open '{}'",
+            flamegraph_filename.display()
+        ))?;
     }
+    
+    Ok(())
+}
     
     #[derive(Debug, structopt::StructOpt)]
     pub struct Options {
