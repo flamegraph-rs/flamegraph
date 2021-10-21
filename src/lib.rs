@@ -222,13 +222,12 @@ mod arch {
     }
 }
 
-
 // Windows unexpectidly generate integer values without any associated function call, resulting in an error in inferno
 #[cfg(windows)]
-fn delete_falty_values(buf :&Vec<u8>) -> Vec<u8>{
+fn delete_falty_values(buf: &Vec<u8>) -> Vec<u8> {
     let regex = Regex::new(r"(?P<value>\r\n[ ]*[0-9]+[ ]*\r\n)[\r\n]*[ ]*[0-9]+[ ]*\r\n").unwrap();
     let string = String::from_utf8_lossy(&buf);
-    let cleaned_string = regex.replace_all(&string,"$value");
+    let cleaned_string = regex.replace_all(&string, "$value");
     cleaned_string.as_bytes().to_owned()
 }
 
@@ -318,10 +317,10 @@ pub fn generate_flamegraph_for_workload(
             flamegraph_filename.display()
         ))?;
     }
-    
+
     Ok(())
 }
-    
+
 #[derive(Debug, structopt::StructOpt)]
 pub struct Options {
     /// Print extra output to help debug problems
