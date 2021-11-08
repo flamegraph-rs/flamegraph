@@ -156,6 +156,15 @@ be acceptable for your security needs etc...
 echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 ```
 
+### DTrace on macOS
+
+On macOS, there is no alternative to running as superuser in order to
+enable dtrace. The simplest way is to use `--root`, this way `rustc`
+will be run normally but the binary will get run as superuser.
+
+Be aware that if the binary being tested is user-aware, this does
+change its behaviour.
+
 ## Improving output when running with `--release`
 
 Due to optimizations etc... sometimes the quality
