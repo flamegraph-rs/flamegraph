@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
 use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
@@ -269,9 +269,18 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
-fn find_unique_target(kind: &[&str], pkg: Option<&str>) -> anyhow::Result<BinaryTarget> {
-    let mut targets: Vec<_> = MetadataCommand::new()
-        .no_deps()
+fn find_unique_target(
+    kind: &[&str],
+    pkg: Option<&str>,
+    manifest_path: Option<&Path>,
+) -> anyhow::Result<BinaryTarget> {
+    let mut metadata_command = MetadataCommand::new();
+    metadata_command.no_deps();
+    if let Some(ref manifest_path) = manifest_path {
+        metadata_command.manifest_path(manifest_path);
+    }
+
+    let mut targets: Vec<_> = metadata_command
         .exec()
         .context("failed to access crate metadata")?
         .packages
@@ -322,12 +331,20 @@ fn main() -> anyhow::Result<()> {
         && opt.test.is_none()
         && opt.unit_test.is_none()
     {
-        let target = find_unique_target(&["bin"], opt.package.as_deref())?;
+        let target = find_unique_target(
+            &["bin"],
+            opt.package.as_deref(),
+            opt.manifest_path.as_deref(),
+        )?;
         opt.bin = Some(target.target);
         opt.package = Some(target.package);
         target.kind
     } else if opt.unit_test == Some(None) {
-        let target = find_unique_target(&["bin", "lib"], opt.package.as_deref())?;
+        let target = find_unique_target(
+            &["bin", "lib"],
+            opt.package.as_deref(),
+            opt.manifest_path.as_deref(),
+        )?;
         opt.unit_test = Some(Some(target.target));
         opt.package = Some(target.package);
         target.kind
