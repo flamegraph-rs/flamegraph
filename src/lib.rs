@@ -268,7 +268,15 @@ pub fn generate_flamegraph_for_workload(
 
     let collapsed_writer = BufWriter::new(&mut collapsed);
 
-    let collapse_options = CollapseOptions::default();
+    #[allow(unused_mut)]
+    let mut collapse_options = CollapseOptions::default();
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(skip_after) = &opts.flamegraph_options.skip_after {
+            collapse_options.skip_after = Some(skip_after.into())
+        }
+    }
 
     Folder::from(collapse_options)
         .collapse(perf_reader, collapsed_writer)
@@ -386,6 +394,10 @@ pub struct FlamegraphOptions {
         ]
     )]
     pub palette: Option<Palette>,
+
+    #[cfg(target_os = "linux")]
+    #[structopt(long = "skip-after")]
+    pub skip_after: Option<String>,
 }
 
 impl FlamegraphOptions {
