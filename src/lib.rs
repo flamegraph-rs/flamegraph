@@ -186,8 +186,8 @@ mod arch {
 
         // Ensure the file is readable by the current user if dtrace was run
         // with sudo.
-        #[cfg(unix)]
         if sudo {
+            #[cfg(unix)]
             if let Ok(user) = env::var("USER") {
                 Command::new("sudo")
                     .args(["chown", user.as_str(), "cargo-flamegraph.stacks"])
