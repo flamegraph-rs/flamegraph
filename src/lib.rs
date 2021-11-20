@@ -89,7 +89,11 @@ mod arch {
         (command, perf_output)
     }
 
-    pub fn output(perf_output: Option<String>, script_no_inline: bool) -> anyhow::Result<Vec<u8>> {
+    pub fn output(
+        perf_output: Option<String>,
+        script_no_inline: bool,
+        _sudo: bool,
+    ) -> anyhow::Result<Vec<u8>> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
 
@@ -171,9 +175,27 @@ mod arch {
         (command, None)
     }
 
-    pub fn output(_: Option<String>, script_no_inline: bool) -> anyhow::Result<Vec<u8>> {
+    pub fn output(
+        _: Option<String>,
+        script_no_inline: bool,
+        sudo: bool,
+    ) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
             return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
+        }
+
+        // Ensure the file is readable by the current user if dtrace was run
+        // with sudo.
+        #[cfg(unix)]
+        if sudo {
+            if let Ok(user) = env::var("USER") {
+                Command::new("sudo")
+                    .args(["chown", user.as_str(), "cargo-flamegraph.stacks"])
+                    .spawn()
+                    .expect(arch::SPAWN_ERROR)
+                    .wait()
+                    .expect(arch::WAIT_ERROR);
+            }
         }
 
         let mut buf = vec![];
@@ -260,7 +282,7 @@ pub fn generate_flamegraph_for_workload(
         perf_output
     };
 
-    let output = arch::output(perf_output, opts.script_no_inline)?;
+    let output = arch::output(perf_output, opts.script_no_inline, opts.root)?;
 
     let perf_reader = BufReader::new(&*output);
 
