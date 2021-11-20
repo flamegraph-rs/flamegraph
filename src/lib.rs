@@ -118,8 +118,8 @@ mod arch {
 mod arch {
     use super::*;
 
-    pub const SPAWN_ERROR: &'static str = "could not spawn dtrace";
-    pub const WAIT_ERROR: &'static str = "unable to wait for dtrace child command to exit";
+    pub const SPAWN_ERROR: &str = "could not spawn dtrace";
+    pub const WAIT_ERROR: &str = "unable to wait for dtrace child command to exit";
 
     pub(crate) fn initial_command(
         workload: Workload,
