@@ -25,9 +25,16 @@ rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 
 ## Installation
 
-Requirements on Linux (Ubuntu/Debian):
-```
+Requirements on Linux:
+
+#### Debian
+```bash
 sudo apt install -y linux-perf
+```
+
+#### Ubuntu
+```bash
+sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
