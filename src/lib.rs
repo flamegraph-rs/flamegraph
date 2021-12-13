@@ -422,10 +422,7 @@ pub struct FlamegraphOptions {
     pub skip_after: Option<String>,
 
     /// Produce a flame chart (sort by time, do not merge stacks)
-    #[structopt(
-        long = "flamechart",
-        conflicts_with = "reverse"
-    )]
+    #[structopt(long = "flamechart", conflicts_with = "reverse")]
     pub flame_chart: bool,
 }
 
