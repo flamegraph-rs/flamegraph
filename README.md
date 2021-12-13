@@ -106,6 +106,7 @@ USAGE:
 FLAGS:
         --deterministic          Colors are selected such that the color of a function does not change between runs
         --dev                    Build with the dev profile
+        --flamechart             Produce a flame chart (sort by time, do not merge stacks)
     -h, --help                   Prints help information
     -i, --inverted               Plot the flame graph up-side-down
         --no-default-features    Disable default features
@@ -131,6 +132,7 @@ OPTIONS:
     -p, --package <package>                package with the binary to run
         --palette <palette>                Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow,
                                            purple, orange, wakeup, java, perl, js, rust]
+        --skip-after <skip-after>          
         --test <test>                      Test binary to run (currently profiles the test harness and all tests in the
                                            binary)
         --unit-test <unit-test>            Crate target to unit test, <unit-test> may be omitted if crate only has one
