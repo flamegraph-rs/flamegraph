@@ -420,6 +420,13 @@ pub struct FlamegraphOptions {
     #[cfg(target_os = "linux")]
     #[structopt(long = "skip-after")]
     pub skip_after: Option<String>,
+
+    /// Produce a flame chart (sort by time, do not merge stacks)
+    #[structopt(
+        long = "flamechart",
+        conflicts_with = "reverse"
+    )]
+    pub flame_chart: bool,
 }
 
 impl FlamegraphOptions {
@@ -436,6 +443,7 @@ impl FlamegraphOptions {
         if let Some(palette) = self.palette {
             options.colors = palette;
         }
+        options.flame_chart = self.flame_chart;
 
         options
     }
