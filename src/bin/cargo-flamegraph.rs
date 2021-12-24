@@ -269,6 +269,42 @@ impl std::fmt::Display for BinaryTarget {
     }
 }
 
+pub fn find_crate_root(manifest_path: Option<&Path>) -> anyhow::Result<PathBuf> {
+    match manifest_path {
+        Some(path) => {
+            let path = path.parent().ok_or_else(|| {
+                anyhow!(
+                    "the manifest path '{}' must point to a Cargo.toml file",
+                    path.display()
+                )
+            })?;
+
+            path.canonicalize().with_context(|| {
+                anyhow!(
+                    "failed to canonicalize manifest parent directory '{}'\nHint: make sure your manifest path is exists and points to a Cargo.toml file",
+                    path.display()
+                )
+            })
+        }
+        None => {
+            let cargo_toml = "Cargo.toml";
+            let cwd = std::env::current_dir().context("failed to determine working directory")?;
+
+            for current in cwd.ancestors() {
+                if current.join(cargo_toml).exists() {
+                    return Ok(current.to_path_buf());
+                }
+            }
+
+            Err(anyhow!(
+                "could not find '{}' in '{}' or any parent directory",
+                cargo_toml,
+                cwd.display()
+            ))
+        }
+    }
+}
+
 fn find_unique_target(
     kind: &[&str],
     pkg: Option<&str>,
@@ -280,12 +316,30 @@ fn find_unique_target(
         metadata_command.manifest_path(manifest_path);
     }
 
-    let mut targets: Vec<_> = metadata_command
+    let crate_root = find_crate_root(manifest_path)?;
+
+    let mut packages = metadata_command
         .exec()
         .context("failed to access crate metadata")?
         .packages
         .into_iter()
-        .filter(|p| pkg.map_or(true, |opt_pkg| p.name == opt_pkg))
+        .filter(|p| match pkg {
+            Some(pkg) => pkg == p.name,
+            None => p.manifest_path.starts_with(&crate_root),
+        })
+        .peekable();
+
+    if packages.peek().is_none() {
+        return Err(match pkg {
+            Some(pkg) => anyhow!("workspace has no package named {}", pkg),
+            None => anyhow!(
+                "failed to find any package in '{}' or below",
+                crate_root.display()
+            ),
+        });
+    }
+
+    let mut targets: Vec<_> = packages
         .flat_map(|p| {
             let Package { targets, name, .. } = p;
             targets.into_iter().filter_map(move |t| {
@@ -311,7 +365,7 @@ fn find_unique_target(
             Ok(target)
         }
         [] => Err(anyhow!(
-            "crate has no automatically selectable target: try passing `--example <example>` \
+            "crate has no automatically selectable target:\nHint: try passing `--example <example>` \
                 or similar to choose a binary"
         )),
         _ => Err(anyhow!(
