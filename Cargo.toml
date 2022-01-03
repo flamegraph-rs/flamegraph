@@ -20,9 +20,10 @@ path = "src/bin/flamegraph.rs"
 [dependencies]
 anyhow = "1.0.43"
 cargo_metadata = "0.14.0"
+clap = { version = "3.0", features = ["derive"] }
+clap_complete = "3.0"
 inferno = "0.10.8"
 opener = "0.5.0"
-structopt = "0.3.14"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"

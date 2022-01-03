@@ -19,6 +19,7 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 use signal_hook::consts::{SIGINT, SIGTERM};
 
 use anyhow::{anyhow, Context};
+use clap::Args;
 use inferno::{
     collapse::Collapse,
     flamegraph::color::Palette,
@@ -241,10 +242,7 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     !status.success()
 }
 
-pub fn generate_flamegraph_for_workload(
-    workload: Workload,
-    mut opts: Options,
-) -> anyhow::Result<()> {
+pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
     // process under observation while we continue to
@@ -306,10 +304,7 @@ pub fn generate_flamegraph_for_workload(
 
     let collapsed_reader = BufReader::new(&*collapsed);
 
-    let flamegraph_filename: PathBuf = opts
-        .output
-        .take()
-        .unwrap_or_else(|| "flamegraph.svg".into());
+    let flamegraph_filename = opts.output;
     println!("writing flamegraph to {:?}", flamegraph_filename);
     let flamegraph_file = File::create(&flamegraph_filename)
         .context("unable to create flamegraph.svg output file")?;
@@ -330,37 +325,37 @@ pub fn generate_flamegraph_for_workload(
     Ok(())
 }
 
-#[derive(Debug, structopt::StructOpt)]
+#[derive(Debug, Args)]
 pub struct Options {
     /// Print extra output to help debug problems
-    #[structopt(short = "v", long = "verbose")]
+    #[clap(short, long)]
     pub verbose: bool,
 
-    /// Output file, flamegraph.svg if not present
-    #[structopt(parse(from_os_str), short = "o", long = "output")]
-    output: Option<PathBuf>,
+    /// Output file
+    #[clap(short, long, default_value = "flamegraph.svg", parse(from_os_str))]
+    output: PathBuf,
 
     /// Open the output .svg file with default program
-    #[structopt(long = "open")]
+    #[clap(long)]
     open: bool,
 
     /// Run with root privileges (using `sudo`)
-    #[structopt(long)]
+    #[clap(long)]
     root: bool,
 
     /// Sampling frequency
-    #[structopt(short = "F", long = "freq")]
+    #[clap(short = 'F', long = "freq")]
     frequency: Option<u32>,
 
     /// Custom command for invoking perf/dtrace
-    #[structopt(short = "c", long = "cmd")]
+    #[clap(short, long = "cmd")]
     custom_cmd: Option<String>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     flamegraph_options: FlamegraphOptions,
 
     /// Disable inlining for perf script because of performance issues
-    #[structopt(long = "no-inline")]
+    #[clap(long = "no-inline")]
     script_no_inline: bool,
 }
 
@@ -377,40 +372,40 @@ impl Options {
     }
 }
 
-#[derive(Debug, structopt::StructOpt)]
+#[derive(Debug, Args)]
 pub struct FlamegraphOptions {
     /// Colors are selected such that the color of a function does not change between runs
-    #[structopt(long = "deterministic")]
+    #[clap(long)]
     pub deterministic: bool,
 
     /// Plot the flame graph up-side-down
-    #[structopt(short = "i", long = "inverted")]
+    #[clap(short, long)]
     pub inverted: bool,
 
     /// Generate stack-reversed flame graph
-    #[structopt(long = "reverse")]
+    #[clap(long)]
     pub reverse: bool,
 
     /// Set embedded notes in SVG
-    #[structopt(long = "notes", value_name = "STRING")]
+    #[clap(long, value_name = "STRING")]
     pub notes: Option<String>,
 
     /// Omit functions smaller than <FLOAT> pixels
-    #[structopt(
-            long = "min-width",
+    #[clap(
+            long,
             default_value = &defaults::str::MIN_WIDTH,
             value_name = "FLOAT"
         )]
     pub min_width: f64,
 
     /// Image width in pixels
-    #[structopt(long = "image-width")]
+    #[clap(long)]
     pub image_width: Option<usize>,
 
     /// Color palette
-    #[structopt(
-        long = "palette",
-        possible_values = &[
+    #[clap(
+        long,
+        possible_values = [
             "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
             "purple", "orange", "wakeup", "java", "perl", "js", "rust"
         ]
@@ -418,11 +413,11 @@ pub struct FlamegraphOptions {
     pub palette: Option<Palette>,
 
     #[cfg(target_os = "linux")]
-    #[structopt(long = "skip-after")]
+    #[clap(long)]
     pub skip_after: Option<String>,
 
     /// Produce a flame chart (sort by time, do not merge stacks)
-    #[structopt(long = "flamechart", conflicts_with = "reverse")]
+    #[clap(long = "flamechart", conflicts_with = "reverse")]
     pub flame_chart: bool,
 }
 

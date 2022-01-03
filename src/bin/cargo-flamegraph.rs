@@ -2,103 +2,62 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
 use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
-use structopt::StructOpt;
+use clap::Parser;
 
 use flamegraph::Workload;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    setting = structopt::clap::AppSettings::TrailingVarArg
-)]
+/// A cargo subcommand for generating flamegraphs, using inferno
+#[derive(Parser, Debug)]
+#[clap(name = "cargo-flamegraph", version)]
 struct Opt {
     /// Build with the dev profile
-    #[structopt(long = "dev")]
+    #[clap(long)]
     dev: bool,
 
     /// package with the binary to run
-    #[structopt(short = "p", long = "package")]
+    #[clap(short, long)]
     package: Option<String>,
 
     /// Binary to run
-    #[structopt(
-        short = "b",
-        long = "bin",
-        conflicts_with = "bench",
-        conflicts_with = "unit-test",
-        conflicts_with = "example",
-        conflicts_with = "test"
-    )]
+    #[clap(short, long, group = "exec-args")]
     bin: Option<String>,
 
     /// Example to run
-    #[structopt(
-        long = "example",
-        conflicts_with = "bench",
-        conflicts_with = "unit-test",
-        conflicts_with = "bin",
-        conflicts_with = "test"
-    )]
+    #[clap(long, group = "exec-args")]
     example: Option<String>,
 
     /// Test binary to run (currently profiles the test harness and all tests in the binary)
-    #[structopt(
-        long = "test",
-        conflicts_with = "bench",
-        conflicts_with = "unit-test",
-        conflicts_with = "bin",
-        conflicts_with = "example"
-    )]
+    #[clap(long, group = "exec-args")]
     test: Option<String>,
 
     /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
     /// (currently profiles the test harness and all tests in the binary; test selection
     /// can be passed as trailing arguments after `--` as separator)
-    #[structopt(
-        long = "unit-test",
-        conflicts_with = "bench",
-        conflicts_with = "bin",
-        conflicts_with = "test",
-        conflicts_with = "example"
-    )]
+    #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
 
     /// Benchmark to run
-    #[structopt(
-        long = "bench",
-        conflicts_with = "bin",
-        conflicts_with = "unit-test",
-        conflicts_with = "example",
-        conflicts_with = "test"
-    )]
+    #[clap(long, group = "exec-args")]
     bench: Option<String>,
 
     /// Path to Cargo.toml
-    #[structopt(long = "manifest-path")]
+    #[clap(long)]
     manifest_path: Option<PathBuf>,
 
     /// Build features to enable
-    #[structopt(short = "f", long = "features")]
+    #[clap(short, long)]
     features: Option<String>,
 
     /// Disable default features
-    #[structopt(long = "no-default-features")]
+    #[clap(long)]
     no_default_features: bool,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     graph: flamegraph::Options,
 
-    /// Trailing arguments are passed to the binary being profiled.
+    /// Trailing arguments passed to the binary being profiled.
+    #[clap(required = true, last = true)]
     trailing_arguments: Vec<String>,
-}
-
-#[derive(Debug, StructOpt)]
-#[structopt(
-    name = "cargo-flamegraph",
-    about = "A cargo subcommand for generating flamegraphs, using inferno"
-)]
-enum Opts {
-    #[structopt(name = "flamegraph")]
-    Flamegraph(Opt),
 }
 
 fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Vec<Artifact>> {
@@ -376,7 +335,7 @@ fn find_unique_target(
 }
 
 fn main() -> anyhow::Result<()> {
-    let Opts::Flamegraph(mut opt) = Opts::from_args();
+    let mut opt = Opt::parse();
     opt.graph.check()?;
 
     let kind = if opt.bin.is_none()
