@@ -27,7 +27,7 @@ rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 
 Requirements on Linux:
 
-#### Debian
+#### Debian (x86 and aarch)
 ```bash
 sudo apt install -y linux-perf
 ```
