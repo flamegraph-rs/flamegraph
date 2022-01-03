@@ -38,6 +38,11 @@ Not working on aarch, use a Debian distribution, or make a PR with your solution
 sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
+#### Pop!_OS
+```bash
+sudo apt install linux-tools-common linux-tools-generic
+```
+
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
 
 ```
