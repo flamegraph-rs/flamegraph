@@ -56,7 +56,7 @@ struct Opt {
     graph: flamegraph::Options,
 
     /// Trailing arguments passed to the binary being profiled.
-    #[clap(required = true, last = true)]
+    #[clap(last = true)]
     trailing_arguments: Vec<String>,
 }
 
