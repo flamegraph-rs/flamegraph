@@ -1,47 +1,43 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use structopt::StructOpt;
+use clap::{IntoApp, Parser};
+use clap_complete::Shell;
 
 use flamegraph::Workload;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    setting = structopt::clap::AppSettings::TrailingVarArg
-)]
+#[derive(Debug, Parser)]
+#[clap(version)]
 struct Opt {
     /// Profile a running process by pid
-    #[structopt(short = "p", long = "pid")]
+    #[clap(short, long)]
     pid: Option<u32>,
 
     /// Generate shell completions for the given shell.
-    #[structopt(long = "completions", conflicts_with = "pid")]
-    completions: Option<structopt::clap::Shell>,
+    #[clap(long, value_name = "SHELL", conflicts_with_all = &["pid", "trailing-arguments"])]
+    completions: Option<Shell>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     graph: flamegraph::Options,
 
-    #[structopt(parse(from_os_str), long = "perfdata", conflicts_with = "pid")]
+    #[clap(long = "perfdata", conflicts_with = "pid", parse(from_os_str))]
     perf_file: Option<PathBuf>,
 
+    #[clap(last = true)]
     trailing_arguments: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     if let Some(shell) = opt.completions {
-        return match opt.trailing_arguments.is_empty() {
-            true => {
-                Opt::clap().gen_completions_to("flamegraph", shell, &mut std::io::stdout().lock());
-                Ok(())
-            }
-            false => {
-                return Err(anyhow!(
-                    "command arguments cannot be used with --completions <completions>"
-                ))
-            }
-        };
+        clap_complete::generate(
+            shell,
+            &mut Opt::into_app(),
+            "flamegraph",
+            &mut std::io::stdout(),
+        );
+        return Ok(());
     }
 
     opt.graph.check()?;
