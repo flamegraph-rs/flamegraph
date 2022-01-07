@@ -2,13 +2,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
 use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
-use clap::Parser;
+use clap::{Args, Parser};
 
 use flamegraph::Workload;
 
-/// A cargo subcommand for generating flamegraphs, using inferno
-#[derive(Parser, Debug)]
-#[clap(name = "cargo-flamegraph", version)]
+#[derive(Args, Debug)]
 struct Opt {
     /// Build with the dev profile
     #[clap(long)]
@@ -58,6 +56,14 @@ struct Opt {
     /// Trailing arguments passed to the binary being profiled.
     #[clap(last = true)]
     trailing_arguments: Vec<String>,
+}
+
+#[derive(Parser, Debug)]
+#[clap(bin_name = "cargo")]
+enum Cli {
+    /// A cargo subcommand for generating flamegraphs, using inferno
+    #[clap(version)]
+    Flamegraph(Opt),
 }
 
 fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Vec<Artifact>> {
@@ -335,7 +341,7 @@ fn find_unique_target(
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut opt = Opt::parse();
+    let Cli::Flamegraph(mut opt) = Cli::parse();
     opt.graph.check()?;
 
     let kind = if opt.bin.is_none()
