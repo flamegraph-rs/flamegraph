@@ -412,8 +412,9 @@ pub struct FlamegraphOptions {
     )]
     pub palette: Option<Palette>,
 
+    /// Cut off stack frames below the named function
     #[cfg(target_os = "linux")]
-    #[clap(long)]
+    #[clap(long, value_name = "STRING")]
     pub skip_after: Option<String>,
 
     /// Produce a flame chart (sort by time, do not merge stacks)
