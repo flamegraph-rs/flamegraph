@@ -145,7 +145,7 @@ OPTIONS:
     -p, --package <package>                package with the binary to run
         --palette <palette>                Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow,
                                            purple, orange, wakeup, java, perl, js, rust]
-        --skip-after <STRING>              Cut off stack frames below the named function [linux only]
+        --skip-after <FUNCTION>            Cut off stack frames below <FUNCTION>; may be repeated [linux only]
         --test <test>                      Test binary to run (currently profiles the test harness and all tests in the
                                            binary)
         --unit-test <unit-test>            Crate target to unit test, <unit-test> may be omitted if crate only has one
