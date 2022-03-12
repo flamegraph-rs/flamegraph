@@ -293,9 +293,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     #[cfg(target_os = "linux")]
     {
-        if let Some(skip_after) = &opts.flamegraph_options.skip_after {
-            collapse_options.skip_after = Some(skip_after.into())
-        }
+        collapse_options.skip_after = opts.flamegraph_options.skip_after.clone();
     }
 
     Folder::from(collapse_options)
@@ -412,10 +410,10 @@ pub struct FlamegraphOptions {
     )]
     pub palette: Option<Palette>,
 
-    /// Cut off stack frames below the named function
+    /// Cut off stack frames below <FUNCTION>; may be repeated
     #[cfg(target_os = "linux")]
-    #[clap(long, value_name = "STRING")]
-    pub skip_after: Option<String>,
+    #[clap(long, value_name = "FUNCTION")]
+    pub skip_after: Vec<String>,
 
     /// Produce a flame chart (sort by time, do not merge stacks)
     #[clap(long = "flamechart", conflicts_with = "reverse")]
