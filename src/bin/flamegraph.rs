@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
     if let Some(shell) = opt.completions {
         clap_complete::generate(
             shell,
-            &mut Opt::into_app(),
+            &mut Opt::command(),
             "flamegraph",
             &mut std::io::stdout(),
         );
