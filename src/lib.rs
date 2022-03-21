@@ -160,7 +160,7 @@ mod arch {
                     if i > 0 {
                         escaped.push(' ');
                     }
-                    escaped.push_str(&arg.replace(" ", "\\ "));
+                    escaped.push_str(&arg.replace(' ', "\\ "));
                 }
 
                 command.arg("-c");
