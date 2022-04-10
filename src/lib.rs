@@ -93,8 +93,22 @@ mod arch {
     pub fn output(
         perf_output: Option<String>,
         script_no_inline: bool,
-        _sudo: bool,
+        sudo: bool,
     ) -> anyhow::Result<Vec<u8>> {
+        if sudo {
+            // We executed `perf record` with sudo, and will be executing `perf script` *without* sudo.
+            // Ensure the perf.data file is readable by the current user, so that `perf script` can
+            // read it.
+            if let Ok(user) = env::var("USER") {
+                Command::new("sudo")
+                    .args(["chown", user.as_str(), "perf.data"])
+                    .spawn()
+                    .expect(arch::SPAWN_ERROR)
+                    .wait()
+                    .expect(arch::WAIT_ERROR);
+            }
+        }
+
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
         let mut command = Command::new(perf);
 
