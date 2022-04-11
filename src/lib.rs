@@ -56,7 +56,7 @@ mod arch {
         };
 
         let args = custom_cmd.unwrap_or(format!(
-            "record -F {} --call-graph dwarf -g",
+            "record -F {} --call-graph dwarf,16384 -g",
             freq.unwrap_or(997)
         ));
 
