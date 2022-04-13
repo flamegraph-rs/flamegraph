@@ -45,7 +45,7 @@ sudo apt install linux-tools-common linux-tools-generic
 
 `flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
 
-```
+```bash
 cargo install flamegraph
 ```
 
@@ -57,7 +57,7 @@ usually something like `~/.cargo/bin`.
 ## Shell auto-completion
 
 At the moment, only `flamegraph` supports auto-completion. Supported shells are `bash`, `fish`, `zsh`, `powershell` and `elvish`.
-`cargo-flamegraph` does not support auto-completion because it is not as straight-forward to implement for custom cargo subcommands. See [#153](https://github.com/flamegraph-rs/flamegraph/pull/153) for details.
+`cargo-flamegraph` does not support auto-completion because it is not as straightforward to implement for custom cargo subcommands. See [#153](https://github.com/flamegraph-rs/flamegraph/pull/153) for details.
 
 How you enable auto-completion depends on your shell, e.g.
 ```bash
@@ -66,7 +66,7 @@ flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_
 
 ## Examples
 
-```
+```bash
 # if you'd like to profile an arbitrary executable:
 flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
 
@@ -112,7 +112,7 @@ cargo flamegraph --unit-test --dev test::may::omit::separator::if::unit::test::f
 
 `flamegraph` is quite simple. `cargo-flamegraph` is more sophisticated:
 
-```
+```bash
 USAGE:
     cargo-flamegraph flamegraph [FLAGS] [OPTIONS] [trailing-arguments]...
 
@@ -189,7 +189,7 @@ suffer when profiling release builds.
 To counter this to some extent, you may either set the following in your
 `Cargo.toml` file:
 
-```
+```toml
 [profile.release]
 debug = true
 ```
@@ -198,21 +198,19 @@ Or set the environment variable [CARGO_PROFILE_RELEASE_DEBUG=true](https://doc.r
 
 Please note that tests, unit tests and benchmarks use the `bench` profile in release mode (see [here](https://doc.rust-lang.org/cargo/reference/profiles.html#profile-selection)).
 
-
 ## Usage with benchmarks
 
 In order to perf existing benchmarks, you should set up a few configs.
 Set the following in your `Cargo.toml` file to run benchmarks:
 
-```
+```toml
 [profile.bench]
 debug = true
 ```
 
-
 ## Use custom paths for perf and dtrace
 
-If `PERF` or `DTRACE` environment variable is set,
+If the `PERF` or `DTRACE` environment variable is set,
 it'll be used as corresponding tool command.
 For example, to use `perf` from `~/bin`:
 
@@ -243,7 +241,7 @@ passing of time from left to right. The left to right ordering
 has no meaning.
 
 The **width** of each box shows the total time that that
-function is on the CPU or is part of the call stack. If a
+the function is on the CPU or is part of the call stack. If a
 function's box is wider than others, that means that it consumes
 more CPU per execution than other functions, or that it is
 called more than other functions.
@@ -324,7 +322,7 @@ optimized. We need to measure our optimizations to make sure that we
 didn't make our code both harder to read AND slower.
 * Measure before you change anything, and save the results
 in a safe place! Many profiling tools will overwrite their old output
-when you run them again, so make sure you take care to save the
+when you rerun them, so make sure you take care to save the
 data before you begin so that you can compare before and after.
 * Take measurements on a warmed up machine that isn't doing anything
 else, and has had time to cool off from the last workload.
@@ -377,7 +375,7 @@ serviced. This can be measured as the queue depth over time
 * **Errors** are when things start to fail, like when queues
 are no longer able to accept any new requests - like when a TCP connection
 is rejected because the system's TCP backlog is already full of
-connections that have not yet been accept'ed by the userspace
+connections that have not yet been accepted by the userspace
 program.
 
 This forms the necessary background to start applying the USE Method
