@@ -135,6 +135,8 @@ mod arch {
 
     pub const SPAWN_ERROR: &str = "could not spawn dtrace";
     pub const WAIT_ERROR: &str = "unable to wait for dtrace child command to exit";
+    #[cfg(target_os = "windows")]
+    pub const BLONDIE_ERROR: &str = "could not find dtrace and could not profile using blondie";
 
     pub(crate) fn initial_command(
         workload: Workload,
@@ -146,10 +148,10 @@ mod arch {
 
         let mut command = if sudo {
             let mut c = Command::new("sudo");
-            c.arg(dtrace);
+            c.arg(&dtrace);
             c
         } else {
-            Command::new(dtrace)
+            Command::new(&dtrace)
         };
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
@@ -179,6 +181,37 @@ mod arch {
 
                 command.arg("-c");
                 command.arg(&escaped);
+
+                #[cfg(target_os = "windows")]
+                {
+                    let mut help_test = Command::new(&dtrace);
+
+                    let dtrace_found = help_test
+                        .arg("--help")
+                        .stderr(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .status()
+                        .is_ok();
+                    if !dtrace_found {
+                        let mut command_builder = std::process::Command::new(&c[0]);
+                        command_builder.args(&c[1..]);
+                        let trace = match blondie::trace_command(command_builder, false) {
+                            Err(err) => {
+                                eprintln!("{}: {:?}", BLONDIE_ERROR, err);
+                                std::process::exit(1);
+                            }
+                            Ok(trace) => trace,
+                        };
+
+                        let f = std::fs::File::create("./cargo-flamegraph.stacks").unwrap();
+                        let mut f = std::io::BufWriter::new(f);
+                        trace.write_dtrace(&mut f).unwrap();
+
+                        // Since blondie already ran Command for us, run a dummy command
+                        command = Command::new("cmd");
+                        command.args(["/C", "exit 0"]);
+                    }
+                }
             }
             Workload::Pid(p) => {
                 command.arg("-p");
