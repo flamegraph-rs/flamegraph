@@ -28,5 +28,8 @@ opener = "0.5.0"
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"
 
+[target.'cfg(windows)'.dependencies]
+blondie = "0.3.0"
+
 [profile.release.build-override]
 opt-level = 0
