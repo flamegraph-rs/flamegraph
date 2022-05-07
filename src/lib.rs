@@ -44,7 +44,8 @@ mod arch {
         sudo: bool,
         freq: Option<u32>,
         custom_cmd: Option<String>,
-    ) -> (Command, Option<String>) {
+        verbose: bool,
+    ) -> Option<String> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
 
         let mut command = if sudo {
@@ -87,7 +88,15 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        (command, perf_output)
+        if verbose {
+            print_command(&command);
+        }
+        let mut recorder = command.spawn().expect(SPAWN_ERROR);
+        let exit_status = recorder.wait().expect(WAIT_ERROR);
+
+        expect_exit_status(exit_status);
+
+        perf_output
     }
 
     pub fn output(
@@ -143,7 +152,8 @@ mod arch {
         sudo: bool,
         freq: Option<u32>,
         custom_cmd: Option<String>,
-    ) -> (Command, Option<String>) {
+        verbose: bool,
+    ) -> Option<String> {
         let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
 
         let mut command = if sudo {
@@ -195,6 +205,10 @@ mod arch {
                     if !dtrace_found {
                         let mut command_builder = std::process::Command::new(&c[0]);
                         command_builder.args(&c[1..]);
+                        if verbose {
+                            print_command(&command_builder)
+                        }
+
                         let trace = match blondie::trace_command(command_builder, false) {
                             Err(err) => {
                                 eprintln!("{}: {:?}", BLONDIE_ERROR, err);
@@ -207,9 +221,7 @@ mod arch {
                         let mut f = std::io::BufWriter::new(f);
                         trace.write_dtrace(&mut f).unwrap();
 
-                        // Since blondie already ran Command for us, run a dummy command
-                        command = Command::new("cmd");
-                        command.args(["/C", "exit 0"]);
+                        return None;
                     }
                 }
             }
@@ -220,7 +232,15 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        (command, None)
+        if verbose {
+            print_command(&command);
+        }
+        let mut recorder = command.spawn().expect(SPAWN_ERROR);
+        let exit_status = recorder.wait().expect(WAIT_ERROR);
+
+        expect_exit_status(exit_status);
+
+        None
     }
 
     pub fn output(
@@ -289,6 +309,21 @@ fn terminated_by_error(status: ExitStatus) -> bool {
     !status.success()
 }
 
+fn expect_exit_status(exit_status: ExitStatus) {
+    // only stop if perf exited unsuccessfully, but
+    // was not killed by a signal (assuming that the
+    // latter case usually means the user interrupted
+    // it in some way)
+    if terminated_by_error(exit_status) {
+        eprintln!("failed to sample program");
+        std::process::exit(1);
+    }
+}
+
+fn print_command(cmd: &Command) {
+    println!("command {:?}", cmd);
+}
+
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -304,28 +339,17 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
-        let (mut command, perf_output) =
-            arch::initial_command(workload, opts.root, opts.frequency, opts.custom_cmd);
-        if opts.verbose {
-            println!("command {:?}", command);
-        }
-
-        let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
-
-        let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
-
-        #[cfg(unix)]
-        signal_hook::low_level::unregister(handler);
-        // only stop if perf exited unsuccessfully, but
-        // was not killed by a signal (assuming that the
-        // latter case usually means the user interrupted
-        // it in some way)
-        if terminated_by_error(exit_status) {
-            eprintln!("failed to sample program");
-            std::process::exit(1);
-        }
-        perf_output
+        arch::initial_command(
+            workload,
+            opts.root,
+            opts.frequency,
+            opts.custom_cmd,
+            opts.verbose,
+        )
     };
+
+    #[cfg(unix)]
+    signal_hook::low_level::unregister(handler);
 
     let output = arch::output(perf_output, opts.script_no_inline, opts.root)?;
 
