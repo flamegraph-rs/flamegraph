@@ -88,12 +88,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        print_command(&command, verbose);
-        let mut recorder = command.spawn().expect(SPAWN_ERROR);
-        let exit_status = recorder.wait().expect(WAIT_ERROR);
-
-        expect_exit_status(exit_status);
-
+        run(command, verbose);
         perf_output
     }
 
@@ -228,12 +223,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        print_command(&command, verbose);
-        let mut recorder = command.spawn().expect(SPAWN_ERROR);
-        let exit_status = recorder.wait().expect(WAIT_ERROR);
-
-        expect_exit_status(exit_status);
-
+        run(command, verbose);
         None
     }
 
@@ -290,6 +280,21 @@ mod arch {
     }
 }
 
+fn run(mut command: Command, verbose: bool) {
+    print_command(&command, verbose);
+    let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
+    let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
+
+    // only stop if perf exited unsuccessfully, but
+    // was not killed by a signal (assuming that the
+    // latter case usually means the user interrupted
+    // it in some way)
+    if terminated_by_error(exit_status) {
+        eprintln!("failed to sample program");
+        std::process::exit(1);
+    }
+}
+
 #[cfg(unix)]
 fn terminated_by_error(status: ExitStatus) -> bool {
     status
@@ -301,17 +306,6 @@ fn terminated_by_error(status: ExitStatus) -> bool {
 #[cfg(not(unix))]
 fn terminated_by_error(status: ExitStatus) -> bool {
     !status.success()
-}
-
-fn expect_exit_status(exit_status: ExitStatus) {
-    // only stop if perf exited unsuccessfully, but
-    // was not killed by a signal (assuming that the
-    // latter case usually means the user interrupted
-    // it in some way)
-    if terminated_by_error(exit_status) {
-        eprintln!("failed to sample program");
-        std::process::exit(1);
-    }
 }
 
 fn print_command(cmd: &Command, verbose: bool) {
