@@ -88,9 +88,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        if verbose {
-            print_command(&command);
-        }
+        print_command(&command, verbose);
         let mut recorder = command.spawn().expect(SPAWN_ERROR);
         let exit_status = recorder.wait().expect(WAIT_ERROR);
 
@@ -205,9 +203,7 @@ mod arch {
                     if !dtrace_found {
                         let mut command_builder = std::process::Command::new(&c[0]);
                         command_builder.args(&c[1..]);
-                        if verbose {
-                            print_command(&command_builder)
-                        }
+                        print_command(&command_builder, verbose);
 
                         let trace = match blondie::trace_command(command_builder, false) {
                             Err(err) => {
@@ -232,9 +228,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        if verbose {
-            print_command(&command);
-        }
+        print_command(&command, verbose);
         let mut recorder = command.spawn().expect(SPAWN_ERROR);
         let exit_status = recorder.wait().expect(WAIT_ERROR);
 
@@ -320,8 +314,10 @@ fn expect_exit_status(exit_status: ExitStatus) {
     }
 }
 
-fn print_command(cmd: &Command) {
-    println!("command {:?}", cmd);
+fn print_command(cmd: &Command, verbose: bool) {
+    if verbose {
+        println!("command {:?}", cmd);
+    }
 }
 
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
