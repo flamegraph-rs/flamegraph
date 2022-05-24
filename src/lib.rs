@@ -3,7 +3,7 @@ use std::{
     fs::File,
     io::{BufReader, BufWriter},
     path::PathBuf,
-    process::{Command, ExitStatus},
+    process::{exit, Command, ExitStatus},
 };
 
 #[cfg(unix)]
@@ -187,23 +187,25 @@ mod arch {
 
                 #[cfg(target_os = "windows")]
                 {
+                    use std::process::Stdio;
+
                     let mut help_test = Command::new(&dtrace);
 
                     let dtrace_found = help_test
                         .arg("--help")
-                        .stderr(std::process::Stdio::null())
-                        .stdout(std::process::Stdio::null())
+                        .stderr(Stdio::null())
+                        .stdout(Stdio::null())
                         .status()
                         .is_ok();
                     if !dtrace_found {
-                        let mut command_builder = std::process::Command::new(&c[0]);
+                        let mut command_builder = Command::new(&c[0]);
                         command_builder.args(&c[1..]);
                         print_command(&command_builder, verbose);
 
                         let trace = match blondie::trace_command(command_builder, false) {
                             Err(err) => {
                                 eprintln!("{}: {:?}", BLONDIE_ERROR, err);
-                                std::process::exit(1);
+                                exit(1);
                             }
                             Ok(trace) => trace,
                         };
@@ -291,7 +293,7 @@ fn run(mut command: Command, verbose: bool) {
     // it in some way)
     if terminated_by_error(exit_status) {
         eprintln!("failed to sample program");
-        std::process::exit(1);
+        exit(1);
     }
 }
 
