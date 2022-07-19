@@ -106,6 +106,9 @@ cargo flamegraph --example some_example --features some_features
 cargo flamegraph --unit-test -- test::in::package::with::single::crate
 cargo flamegraph --unit-test crate_name -- test::in::package::with::multiple:crate
 cargo flamegraph --unit-test --dev test::may::omit::separator::if::unit::test::flag::not::last::flag
+
+# Profile integration tests.
+cargo flamegraph --test test_name
 ```
 
 ## Usage
