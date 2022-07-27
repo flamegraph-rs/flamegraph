@@ -1,9 +1,9 @@
 use std::{
     env,
     fs::File,
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
-    process::{exit, Command, ExitStatus},
+    process::{exit, Command, ExitStatus, Stdio},
 };
 
 #[cfg(unix)]
@@ -187,8 +187,6 @@ mod arch {
 
                 #[cfg(target_os = "windows")]
                 {
-                    use std::process::Stdio;
-
                     let mut help_test = Command::new(&dtrace);
 
                     let dtrace_found = help_test
@@ -256,7 +254,6 @@ mod arch {
         let mut f = File::open("cargo-flamegraph.stacks")
             .context("failed to open dtrace output file 'cargo-flamegraph.stacks'")?;
 
-        use std::io::Read;
         f.read_to_end(&mut buf)
             .context("failed to read dtrace expected output file 'cargo-flamegraph.stacks'")?;
 
@@ -363,6 +360,52 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
         .collapse(perf_reader, collapsed_writer)
         .context("unable to collapse generated profile data")?;
 
+    if let Some(command) = opts.post_process {
+        let command_vec = shlex::split(&command)
+            .ok_or_else(|| anyhow!("unable to parse post-process command"))?;
+
+        let mut child = Command::new(
+            &command_vec
+                .get(0)
+                .ok_or_else(|| anyhow!("unable to parse post-process command"))?,
+        )
+        .args(command_vec.get(1..).unwrap_or(&[]))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("unable to execute {:?}", command_vec))?;
+
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("unable to capture post-process stdin"))?;
+
+        let mut stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("unable to capture post-process stdout"))?;
+
+        let thread_handle = std::thread::spawn(move || -> anyhow::Result<_> {
+            let mut collapsed_processed = Vec::new();
+            stdout.read_to_end(&mut collapsed_processed).context(
+                "unable to read the processed stacks from the stdout of the post-process process",
+            )?;
+            Ok(collapsed_processed)
+        });
+
+        stdin
+            .write_all(&collapsed)
+            .context("unable to write the raw stacks to the stdin of the post-process process")?;
+        drop(stdin);
+
+        anyhow::ensure!(
+            child.wait()?.success(),
+            "post-process exited with a non zero exit code"
+        );
+
+        collapsed = thread_handle.join().unwrap()?;
+    }
+
     let collapsed_reader = BufReader::new(&*collapsed);
 
     let flamegraph_filename = opts.output;
@@ -418,6 +461,11 @@ pub struct Options {
     /// Disable inlining for perf script because of performance issues
     #[clap(long = "no-inline")]
     script_no_inline: bool,
+
+    /// Run a command to process the folded stacks, taking the input from stdin and outputting to
+    /// stdout.
+    #[clap(long)]
+    post_process: Option<String>,
 }
 
 impl Options {
