@@ -151,6 +151,8 @@ OPTIONS:
     -p, --package <package>                package with the binary to run
         --palette <palette>                Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow,
                                            purple, orange, wakeup, java, perl, js, rust]
+        --post-process                     Run a command to process the folded stacks, taking the input from stdin 
+                                           and outputting to stdout.
         --skip-after <FUNCTION>            Cut off stack frames below <FUNCTION>; may be repeated [linux only]
         --test <test>                      Test binary to run (currently profiles the test harness and all tests in the
                                            binary)
