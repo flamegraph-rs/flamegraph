@@ -68,7 +68,7 @@ flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_
 
 ```
 # if you'd like to profile an arbitrary executable:
-flamegraph [-o my_flamegraph.svg] /path/to/my/binary --my-arg 5
+flamegraph [-o my_flamegraph.svg] -- /path/to/my/binary --my-arg 5
 
 # or if the executable is already running, you can provide the PID via `-p` (or `--pid`) flag:
 flamegraph [-o my_flamegraph.svg] --pid 1337
