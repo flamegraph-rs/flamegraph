@@ -28,6 +28,8 @@ rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 Requirements on Linux:
 
 #### Debian (x86 and aarch)
+**Note**: Debian bullseye (the current stable version as of 2022) packages an outdated version of Rust which does not meet flamegraph's requirements. You should use [rustup](https://rustup.rs/) to install an up-to-date version of Rust, or upgrade to Debian bookworm (the current testing version) or newer.
+
 ```bash
 sudo apt install -y linux-perf
 ```
