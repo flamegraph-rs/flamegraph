@@ -202,7 +202,13 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
 
     const NONE: u32 = 0;
     if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
-        let profile = match opt.example.as_ref().or(opt.bin.as_ref()) {
+        let profile = match opt
+            .example
+            .as_ref()
+            .or(opt.bin.as_ref())
+            .or_else(|| opt.unit_test.as_ref().unwrap_or(&None).as_ref())
+        {
+            // binaries, examples and unit tests use release profile
             Some(_) => "release",
             // tests use the bench profile in release mode.
             _ => "bench",
