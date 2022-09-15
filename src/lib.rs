@@ -124,10 +124,15 @@ mod arch {
             command.arg(perf_output);
         }
 
-        Ok(command
-            .output()
-            .context("unable to call perf script")?
-            .stdout)
+        let output = command.output().context("unable to call perf script")?;
+        if !output.status.success() {
+            anyhow::bail!(format!(
+                "unable to run 'perf script': ({}) {}",
+                output.status,
+                std::str::from_utf8(&output.stderr)?
+            ));
+        }
+        Ok(output.stdout)
     }
 }
 
