@@ -50,6 +50,10 @@ struct Opt {
     #[clap(long)]
     no_default_features: bool,
 
+    /// No-op. For compatibility with `cargo run --release`.
+    #[clap(short, long)]
+    release: bool,
+
     #[clap(flatten)]
     graph: flamegraph::Options,
 
