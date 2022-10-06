@@ -314,18 +314,34 @@ fn find_unique_target(
         });
     }
 
+    let mut num_packages = 0;
+    let mut is_default = false;
+
     let mut targets: Vec<_> = packages
         .flat_map(|p| {
-            let Package { targets, name, .. } = p;
+            let Package {
+                targets,
+                name,
+                default_run,
+                ..
+            } = p;
+            num_packages += 1;
+            if default_run.is_some() {
+                is_default = true;
+            }
             targets.into_iter().filter_map(move |t| {
-                t.kind
-                    .iter()
-                    .any(|s| kind.contains(&s.as_str()))
-                    .then(|| BinaryTarget {
-                        package: name.clone(),
-                        target: t.name,
-                        kind: t.kind,
-                    })
+                // Keep only targets that are of the right kind.
+                let ok_kind = t.kind.iter().any(|s| kind.contains(&s.as_str()));
+                // When `default_run` is set, keep only the target with that name.
+                let default_filter = match &default_run {
+                    None => true,
+                    Some(default_name) => &t.name == default_name,
+                };
+                (ok_kind && default_filter).then(|| BinaryTarget {
+                    package: name.clone(),
+                    target: t.name,
+                    kind: t.kind,
+                })
             })
         })
         .collect();
@@ -333,10 +349,13 @@ fn find_unique_target(
     match targets.as_slice() {
         [_] => {
             let target = targets.remove(0);
-            eprintln!(
-                "automatically selected {} as it is the only valid target",
-                target
-            );
+            // If the selected target is the default_run of the only package, do not print a message.
+            if num_packages != 1 || !is_default {
+                eprintln!(
+                    "automatically selected {} as it is the only valid target",
+                    target
+                );
+            }
             Ok(target)
         }
         [] => Err(anyhow!(
