@@ -20,11 +20,7 @@ use signal_hook::consts::{SIGINT, SIGTERM};
 
 use anyhow::{anyhow, Context};
 use clap::Args;
-use inferno::{
-    collapse::Collapse,
-    flamegraph::color::Palette,
-    flamegraph::{defaults, from_reader},
-};
+use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 
 pub enum Workload {
     Command(Vec<String>),
@@ -441,7 +437,7 @@ pub struct Options {
     pub verbose: bool,
 
     /// Output file
-    #[clap(short, long, default_value = "flamegraph.svg", parse(from_os_str))]
+    #[clap(short, long, default_value = "flamegraph.svg")]
     output: PathBuf,
 
     /// Open the output .svg file with default program
@@ -505,11 +501,7 @@ pub struct FlamegraphOptions {
     pub notes: Option<String>,
 
     /// Omit functions smaller than <FLOAT> pixels
-    #[clap(
-            long,
-            default_value = &defaults::str::MIN_WIDTH,
-            value_name = "FLOAT"
-        )]
+    #[clap(long, default_value = "0.01f32", value_name = "FLOAT")]
     pub min_width: f64,
 
     /// Image width in pixels
@@ -519,10 +511,10 @@ pub struct FlamegraphOptions {
     /// Color palette
     #[clap(
         long,
-        possible_values = [
+        value_parser([
             "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
             "purple", "orange", "wakeup", "java", "perl", "js", "rust"
-        ]
+        ])
     )]
     pub palette: Option<Palette>,
 

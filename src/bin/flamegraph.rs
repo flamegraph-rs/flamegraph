@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use clap::{IntoApp, Parser};
+use clap::{CommandFactory, Parser};
 use clap_complete::Shell;
 
 use flamegraph::Workload;
@@ -20,7 +20,7 @@ struct Opt {
     #[clap(flatten)]
     graph: flamegraph::Options,
 
-    #[clap(long = "perfdata", conflicts_with = "pid", parse(from_os_str))]
+    #[clap(long = "perfdata", conflicts_with = "pid")]
     perf_file: Option<PathBuf>,
 
     #[clap(last = true)]
