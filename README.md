@@ -25,6 +25,15 @@ rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 
 ## Installation
 
+```
+cargo install flamegraph
+```
+
+This will make the `flamegraph` and
+`cargo-flamegraph` binaries available in your cargo
+binary directory. On most systems this is
+usually something like `~/.cargo/bin`.
+
 Requirements on Linux:
 
 #### Debian (x86 and aarch)
@@ -40,21 +49,15 @@ Not working on aarch, use a Debian distribution, or make a PR with your solution
 sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
+#### Ubuntu/Ubuntu MATE (Raspberry Pi)
+```bash
+sudo apt install linux-tools-raspi
+```
+
 #### Pop!_OS
 ```bash
 sudo apt install linux-tools-common linux-tools-generic
 ```
-
-`flamegraph` not `cargo-flamegraph`! (`cargo-flamegraph` is an inactive crate as of March 2019)
-
-```
-cargo install flamegraph
-```
-
-This will make the `flamegraph` and
-`cargo-flamegraph` binaries available in your cargo
-binary directory. On most systems this is
-usually something like `~/.cargo/bin`.
 
 ## Shell auto-completion
 
