@@ -12,6 +12,10 @@ struct Opt {
     #[clap(long)]
     dev: bool,
 
+    /// Build with the specified profile
+    #[clap(long)]
+    profile: Option<String>,
+
     /// package with the binary to run
     #[clap(short, long)]
     package: Option<String>,
@@ -84,8 +88,10 @@ fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Ve
         cmd.arg("build");
     }
 
-    // do not use `--release` when we are building for `bench`
-    if !opt.dev && opt.bench.is_none() {
+    if let Some(profile) = &opt.profile {
+        cmd.arg("--profile").arg(profile);
+    } else if !opt.dev && opt.bench.is_none() {
+        // do not use `--release` when we are building for `bench`
         cmd.arg("--release");
     }
 
