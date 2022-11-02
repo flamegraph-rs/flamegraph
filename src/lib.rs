@@ -501,7 +501,7 @@ pub struct FlamegraphOptions {
     pub notes: Option<String>,
 
     /// Omit functions smaller than <FLOAT> pixels
-    #[clap(long, default_value = "0.01f32", value_name = "FLOAT")]
+    #[clap(long, default_value = "0.01", value_name = "FLOAT")]
     pub min_width: f64,
 
     /// Image width in pixels
