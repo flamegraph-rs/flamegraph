@@ -290,6 +290,7 @@ fn find_unique_target(
     kind: &[&str],
     pkg: Option<&str>,
     manifest_path: Option<&Path>,
+    target_name: Option<&str>,
 ) -> anyhow::Result<BinaryTarget> {
     let mut metadata_command = MetadataCommand::new();
     metadata_command.no_deps();
@@ -343,7 +344,10 @@ fn find_unique_target(
                     None => true,
                     Some(default_name) => &t.name == default_name,
                 };
-                (ok_kind && default_filter).then(|| BinaryTarget {
+                let name_filter = target_name
+                    .map(|target_name| t.name == target_name)
+                    .unwrap_or(true);
+                (ok_kind && default_filter && name_filter).then(|| BinaryTarget {
                     package: name.clone(),
                     target: t.name,
                     kind: t.kind,
@@ -389,15 +393,17 @@ fn main() -> anyhow::Result<()> {
             &["bin"],
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
+            None,
         )?;
         opt.bin = Some(target.target);
         opt.package = Some(target.package);
         target.kind
-    } else if opt.unit_test == Some(None) {
+    } else if let Some(unit_test) = opt.unit_test {
         let target = find_unique_target(
             &["bin", "lib"],
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
+            unit_test.as_deref(),
         )?;
         opt.unit_test = Some(Some(target.target));
         opt.package = Some(target.package);
