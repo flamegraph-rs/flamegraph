@@ -344,9 +344,10 @@ fn find_unique_target(
                     None => true,
                     Some(default_name) => &t.name == default_name,
                 };
-                let name_filter = target_name
-                    .map(|target_name| t.name == target_name)
-                    .unwrap_or(true);
+                let name_filter = match target_name {
+                    None => true,
+                    Some(target_name) => t.name == target_name
+                };
                 (ok_kind && default_filter && name_filter).then(|| BinaryTarget {
                     package: name.clone(),
                     target: t.name,
