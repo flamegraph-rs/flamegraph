@@ -346,7 +346,7 @@ fn find_unique_target(
                 };
                 let name_filter = match target_name {
                     None => true,
-                    Some(target_name) => t.name == target_name
+                    Some(target_name) => t.name == target_name,
                 };
                 (ok_kind && default_filter && name_filter).then(|| BinaryTarget {
                     package: name.clone(),
