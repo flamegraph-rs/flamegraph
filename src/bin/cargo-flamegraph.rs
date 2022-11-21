@@ -338,17 +338,22 @@ fn find_unique_target(
             }
             targets.into_iter().filter_map(move |t| {
                 // Keep only targets that are of the right kind.
-                let ok_kind = t.kind.iter().any(|s| kind.contains(&s.as_str()));
+                if !t.kind.iter().any(|s| kind.contains(&s.as_str())) {
+                    return None;
+                }
+
                 // When `default_run` is set, keep only the target with that name.
-                let default_filter = match &default_run {
-                    None => true,
-                    Some(default_name) => &t.name == default_name,
-                };
-                let name_filter = match target_name {
-                    None => true,
-                    Some(target_name) => t.name == target_name,
-                };
-                (ok_kind && default_filter && name_filter).then(|| BinaryTarget {
+                match &default_run {
+                    Some(name) if name != &t.name => return None,
+                    _ => {}
+                }
+
+                match target_name {
+                    Some(name) if name != t.name => return None,
+                    _ => {}
+                }
+
+                Some(BinaryTarget {
                     package: name.clone(),
                     target: t.name,
                     kind: t.kind,
