@@ -462,6 +462,7 @@ pub struct Options {
     #[clap(flatten)]
     flamegraph_options: FlamegraphOptions,
 
+    /// Ignores perf's exit code
     #[clap(long)]
     ignore_status: bool,
 
