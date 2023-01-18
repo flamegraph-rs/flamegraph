@@ -41,6 +41,7 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
+        ignore_status: bool,
     ) -> Option<String> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
 
@@ -84,7 +85,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        run(command, verbose);
+        run(command, verbose, ignore_status);
         perf_output
     }
 
@@ -147,6 +148,7 @@ mod arch {
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
+        ignore_status: bool,
     ) -> Option<String> {
         let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
 
@@ -224,7 +226,7 @@ mod arch {
             Workload::ReadPerf(_) => (),
         }
 
-        run(command, verbose);
+        run(command, verbose, ignore_status);
         None
     }
 
@@ -280,7 +282,7 @@ mod arch {
     }
 }
 
-fn run(mut command: Command, verbose: bool) {
+fn run(mut command: Command, verbose: bool, ignore_status: bool) {
     print_command(&command, verbose);
     let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
     let exit_status = recorder.wait().expect(arch::WAIT_ERROR);
@@ -289,7 +291,7 @@ fn run(mut command: Command, verbose: bool) {
     // was not killed by a signal (assuming that the
     // latter case usually means the user interrupted
     // it in some way)
-    if terminated_by_error(exit_status) {
+    if !ignore_status && terminated_by_error(exit_status) {
         eprintln!("failed to sample program");
         exit(1);
     }
@@ -335,6 +337,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
             opts.frequency,
             opts.custom_cmd,
             opts.verbose,
+            opts.ignore_status,
         )
     };
 
@@ -458,6 +461,9 @@ pub struct Options {
 
     #[clap(flatten)]
     flamegraph_options: FlamegraphOptions,
+
+    #[clap(long)]
+    ignore_status: bool,
 
     /// Disable inlining for perf script because of performance issues
     #[clap(long = "no-inline")]
