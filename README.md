@@ -124,35 +124,44 @@ cargo flamegraph --test test_name
 `flamegraph` is quite simple. `cargo-flamegraph` is more sophisticated:
 
 ```
-Usage: flamegraph [OPTIONS] [-- <TRAILING_ARGUMENTS>...]
+Usage: cargo flamegraph [OPTIONS] [-- <TRAILING_ARGUMENTS>...]
 
 Arguments:
-  [TRAILING_ARGUMENTS]...
+  [TRAILING_ARGUMENTS]...  Trailing arguments passed to the binary being profiled
 
 Options:
-  -p, --pid <PID>                    Profile a running process by pid
-      --completions <SHELL>          Generate shell completions for the given shell [possible values: bash, elvish, fish, powershell, zsh]
-  -v, --verbose                      Print extra output to help debug problems
-  -o, --output <OUTPUT>              Output file [default: flamegraph.svg]
-      --open                         Open the output .svg file with default program
-      --root                         Run with root privileges (using `sudo`)
-  -F, --freq <FREQUENCY>             Sampling frequency
-  -c, --cmd <CUSTOM_CMD>             Custom command for invoking perf/dtrace
-      --deterministic                Colors are selected such that the color of a function does not change between runs
-  -i, --inverted                     Plot the flame graph up-side-down
-      --reverse                      Generate stack-reversed flame graph
-      --notes <STRING>               Set embedded notes in SVG
-      --min-width <FLOAT>            Omit functions smaller than <FLOAT> pixels [default: 0.01]
-      --image-width <IMAGE_WIDTH>    Image width in pixels
-      --palette <PALETTE>            Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow, purple, orange, wakeup, java, perl, js, rust]
-      --skip-after <FUNCTION>        Cut off stack frames below <FUNCTION>; may be repeated
-      --flamechart                   Produce a flame chart (sort by time, do not merge stacks)
-      --ignore-status                Ignores perf's exit code
-      --no-inline                    Disable inlining for perf script because of performance issues
-      --post-process <POST_PROCESS>  Run a command to process the folded stacks, taking the input from stdin and outputting to stdout
-      --perfdata <PERF_FILE>
-  -h, --help                         Print help
-  -V, --version                      Print version
+      --dev                            Build with the dev profile
+      --profile <PROFILE>              Build with the specified profile
+  -p, --package <PACKAGE>              package with the binary to run
+  -b, --bin <BIN>                      Binary to run
+      --example <EXAMPLE>              Example to run
+      --test <TEST>                    Test binary to run (currently profiles the test harness and all tests in the binary)
+      --unit-test [<UNIT_TEST>]        Crate target to unit test, <unit-test> may be omitted if crate only has one target (currently profiles the test harness and all tests in the binary; test selection can be passed as trailing arguments after `--` as separator)
+      --bench <BENCH>                  Benchmark to run
+      --manifest-path <MANIFEST_PATH>  Path to Cargo.toml
+  -f, --features <FEATURES>            Build features to enable
+      --no-default-features            Disable default features
+  -r, --release                        No-op. For compatibility with `cargo run --release`
+  -v, --verbose                        Print extra output to help debug problems
+  -o, --output <OUTPUT>                Output file [default: flamegraph.svg]
+      --open                           Open the output .svg file with default program
+      --root                           Run with root privileges (using `sudo`)
+  -F, --freq <FREQUENCY>               Sampling frequency
+  -c, --cmd <CUSTOM_CMD>               Custom command for invoking perf/dtrace
+      --deterministic                  Colors are selected such that the color of a function does not change between runs
+  -i, --inverted                       Plot the flame graph up-side-down
+      --reverse                        Generate stack-reversed flame graph
+      --notes <STRING>                 Set embedded notes in SVG
+      --min-width <FLOAT>              Omit functions smaller than <FLOAT> pixels [default: 0.01]
+      --image-width <IMAGE_WIDTH>      Image width in pixels
+      --palette <PALETTE>              Color palette [possible values: hot, mem, io, red, green, blue, aqua, yellow, purple, orange, wakeup, java, perl, js, rust]
+      --skip-after <FUNCTION>          Cut off stack frames below <FUNCTION>; may be repeated
+      --flamechart                     Produce a flame chart (sort by time, do not merge stacks)
+      --ignore-status                  Ignores perf's exit code
+      --no-inline                      Disable inlining for perf script because of performance issues
+      --post-process <POST_PROCESS>    Run a command to process the folded stacks, taking the input from stdin and outputting to stdout
+  -h, --help                           Print help
+  -V, --version                        Print version
 ```
 
 Then open the resulting `flamegraph.svg` with a browser, because most image
