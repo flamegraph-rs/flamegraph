@@ -30,7 +30,7 @@ shlex = "1.1.0"
 signal-hook = "0.3.10"
 
 [target.'cfg(windows)'.dependencies]
-blondie = "0.3.0"
+blondie = "0.4.0"
 
 [profile.release.build-override]
 opt-level = 0
