@@ -1,3 +1,8 @@
+[advisories]
+unmaintained = "deny"
+unsound = "deny"
+yanked = "deny"
+
 [licenses]
 allow-osi-fsf-free = "either"
 copyleft = "warn"
