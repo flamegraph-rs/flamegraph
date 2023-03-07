@@ -323,7 +323,6 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options, itera
     // generate our flamegraph.  (ctrl+c will send the
     // SIGINT signal to all processes in the foreground
     // process group).
-
     #[cfg(unix)]
     let handler = unsafe {
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
