@@ -143,7 +143,7 @@ mod arch {
     pub const BLONDIE_ERROR: &str = "could not find dtrace and could not profile using blondie";
 
     pub(crate) fn initial_command(
-        workload: Workload,
+        workload: &Workload,
         sudo: bool,
         freq: Option<u32>,
         custom_cmd: Option<String>,
@@ -316,35 +316,38 @@ fn print_command(cmd: &Command, verbose: bool) {
     }
 }
 
-pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
+pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options, iterations: usize) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
     // process under observation while we continue to
     // generate our flamegraph.  (ctrl+c will send the
     // SIGINT signal to all processes in the foreground
     // process group).
+
     #[cfg(unix)]
     let handler = unsafe {
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    let perf_output = if let Workload::ReadPerf(perf_file) = workload {
-        Some(perf_file)
-    } else {
-        arch::initial_command(
-            workload,
-            opts.root,
-            opts.frequency,
-            opts.custom_cmd,
-            opts.verbose,
-            opts.ignore_status,
-        )
-    };
-
+    for _i in 0..iterations {
+        if let Workload::ReadPerf(_perf_file) = &workload {
+            // pass
+        } else {
+            arch::initial_command(
+                &workload,
+                opts.root,
+                opts.frequency,
+                opts.custom_cmd.clone(),
+                opts.verbose,
+                opts.ignore_status,
+            );
+        };    
+    }
+    
     #[cfg(unix)]
     signal_hook::low_level::unregister(handler);
 
-    let output = arch::output(perf_output, opts.script_no_inline, opts.root)?;
+    let output = arch::output(None, opts.script_no_inline, opts.root)?;
 
     let perf_reader = BufReader::new(&*output);
 
