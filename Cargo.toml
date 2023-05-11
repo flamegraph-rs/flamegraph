@@ -2,6 +2,7 @@
 name = "flamegraph"
 version = "0.6.3"
 edition = "2021"
+rust-version = "1.64"
 description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/flamegraph-rs/flamegraph"
