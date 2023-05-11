@@ -1,13 +1,13 @@
 [package]
 name = "flamegraph"
 version = "0.6.3"
+edition = "2021"
 description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/flamegraph-rs/flamegraph"
 keywords = ["perf", "flamegraph", "profiling", "cargo", "cargo-subcommand"]
 categories = ["command-line-utilities", "development-tools::profiling", "visualization", "development-tools::cargo-plugins"]
 readme = "README.md"
-edition = "2018"
 
 [[bin]]
 name = "cargo-flamegraph"
