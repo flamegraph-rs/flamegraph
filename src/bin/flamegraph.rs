@@ -14,7 +14,7 @@ struct Opt {
     pid: Option<u32>,
 
     /// Generate shell completions for the given shell.
-    #[clap(long, value_name = "SHELL", conflicts_with_all = &["pid", "trailing-arguments"])]
+    #[clap(long, value_name = "SHELL", exclusive(true))]
     completions: Option<Shell>,
 
     #[clap(flatten)]
