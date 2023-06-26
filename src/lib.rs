@@ -522,10 +522,7 @@ pub struct FlamegraphOptions {
     /// Color palette
     #[clap(
         long,
-        value_parser = PossibleValuesParser::new([
-            "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
-            "purple", "orange", "wakeup", "java", "perl", "js", "rust"
-        ]).map(|s| Palette::from_str(&s).unwrap())
+        value_parser = PossibleValuesParser::new(Palette::VARIANTS).map(|s| Palette::from_str(&s).unwrap())
     )]
     pub palette: Option<Palette>,
 
