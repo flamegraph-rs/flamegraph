@@ -4,6 +4,7 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
+    str::FromStr,
 };
 
 #[cfg(unix)]
@@ -19,7 +20,10 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 use signal_hook::consts::{SIGINT, SIGTERM};
 
 use anyhow::{anyhow, Context};
-use clap::Args;
+use clap::{
+    builder::{PossibleValuesParser, TypedValueParser},
+    Args,
+};
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 
 pub enum Workload {
@@ -518,10 +522,10 @@ pub struct FlamegraphOptions {
     /// Color palette
     #[clap(
         long,
-        value_parser([
+        value_parser = PossibleValuesParser::new([
             "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
             "purple", "orange", "wakeup", "java", "perl", "js", "rust"
-        ])
+        ]).map(|s| Palette::from_str(&s).unwrap())
     )]
     pub palette: Option<Palette>,
 
