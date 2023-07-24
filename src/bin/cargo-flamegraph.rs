@@ -378,7 +378,7 @@ fn find_unique_target(
                 or similar to choose a binary"
         )),
         _ => Err(anyhow!(
-            "several possible targets found: {:?}, please pass an explicit target.",
+            "several possible targets found: {:#?}, please pass an explicit target.",
             targets
         )),
     }
