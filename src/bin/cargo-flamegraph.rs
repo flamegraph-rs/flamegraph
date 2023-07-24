@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
-use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
+use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package};
 use clap::{Args, Parser};
 
 use flamegraph::Workload;
@@ -196,7 +196,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
                     a.target.name == *target
                         && a.target.kind.iter().any(|k| kind.contains(&k.as_str()))
                 })
-                .map(|e| (a.profile.debuginfo, e))
+                .map(|e| (&a.profile.debuginfo, e))
         })
         .ok_or_else(|| {
             let targets: Vec<_> = artifacts
@@ -210,8 +210,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             )
         })?;
 
-    const NONE: u32 = 0;
-    if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
+    if !opt.dev && debug_level == &ArtifactDebuginfo::None {
         let profile = match opt
             .example
             .as_ref()

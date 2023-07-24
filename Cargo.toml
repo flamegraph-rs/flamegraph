@@ -20,7 +20,7 @@ path = "src/bin/flamegraph.rs"
 
 [dependencies]
 anyhow = "1.0.43"
-cargo_metadata = "0.15.0"
+cargo_metadata = "0.17"
 clap = { version = "4.0.11", features = ["derive"] }
 clap_complete = "4.0.2"
 inferno = { version = "0.11.0", default_features = false, features = ["multithreaded", "nameattr"] }
