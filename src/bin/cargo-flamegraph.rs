@@ -74,7 +74,7 @@ enum Cli {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Vec<Artifact>> {
+fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
@@ -121,7 +121,7 @@ fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Ve
     }
 
     if let Some(Some(ref unit_test)) = opt.unit_test {
-        match kind.into_iter().any(|k| k == "lib") {
+        match kind.iter().any(|k| k == "lib") {
             true => cmd.arg("--lib"),
             false => cmd.args(&["--bin", unit_test]),
         };
