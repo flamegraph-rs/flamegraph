@@ -81,9 +81,9 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     // This will build benchmarks with the `bench` profile. This is needed
     // because the `--profile` argument for `cargo build` is unstable.
     if !opt.dev && opt.bench.is_some() {
-        cmd.args(&["bench", "--no-run"]);
+        cmd.args(["bench", "--no-run"]);
     } else if opt.unit_test.is_some() {
-        cmd.args(&["test", "--no-run"]);
+        cmd.args(["test", "--no-run"]);
     } else {
         cmd.arg("build");
     }
@@ -123,7 +123,7 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     if let Some(Some(ref unit_test)) = opt.unit_test {
         match kind.iter().any(|k| k == "lib") {
             true => cmd.arg("--lib"),
-            false => cmd.args(&["--bin", unit_test]),
+            false => cmd.args(["--bin", unit_test]),
         };
     }
 
