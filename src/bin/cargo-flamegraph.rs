@@ -38,6 +38,12 @@ struct Opt {
     #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
 
+    /// Crate target to unit benchmark, <bench> may be omitted if crate only has one target
+    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// can be passed as trailing arguments after `--` as separator)
+    #[clap(long, group = "exec-args")]
+    unit_bench: Option<Option<String>>,
+
     /// Benchmark to run
     #[clap(long, group = "exec-args")]
     bench: Option<String>,
@@ -80,7 +86,7 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
 
     // This will build benchmarks with the `bench` profile. This is needed
     // because the `--profile` argument for `cargo build` is unstable.
-    if !opt.dev && opt.bench.is_some() {
+    if !opt.dev && (opt.bench.is_some() || opt.unit_bench.is_some()) {
         cmd.args(["bench", "--no-run"]);
     } else if opt.unit_test.is_some() {
         cmd.args(["test", "--no-run"]);
@@ -90,7 +96,7 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
 
     if let Some(profile) = &opt.profile {
         cmd.arg("--profile").arg(profile);
-    } else if !opt.dev && opt.bench.is_none() {
+    } else if !opt.dev && opt.bench.is_none() && opt.unit_bench.is_none() {
         // do not use `--release` when we are building for `bench`
         cmd.arg("--release");
     }
@@ -124,6 +130,13 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
         match kind.iter().any(|k| k == "lib") {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_test]),
+        };
+    }
+
+    if let Some(Some(ref unit_bench)) = opt.unit_bench {
+        match kind.iter().any(|k| k == "lib") {
+            true => cmd.arg("--lib"),
+            false => cmd.args(["--bin", unit_bench]),
         };
     }
 
@@ -166,6 +179,8 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
 }
 
 fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
+    let mut trailing_arguments = opt.trailing_arguments.clone();
+
     if artifacts.iter().all(|a| a.executable.is_none()) {
         return Err(anyhow!(
             "build artifacts do not contain any executable to profile"
@@ -183,6 +198,13 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             unit_test: Some(Some(t)),
             ..
         } => (&["lib", "bin"], t),
+        Opt {
+            unit_bench: Some(Some(t)),
+            ..
+        } => {
+            trailing_arguments.push("--bench".to_string());
+            (&["lib", "bin"], t)
+        }
         _ => return Err(anyhow!("no target for profiling")),
     };
 
@@ -230,9 +252,9 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
     }
 
-    let mut command = Vec::with_capacity(1 + opt.trailing_arguments.len());
+    let mut command = Vec::with_capacity(1 + trailing_arguments.len());
     command.push(binary_path.to_string());
-    command.extend(opt.trailing_arguments.iter().cloned());
+    command.extend(trailing_arguments);
     Ok(command)
 }
 
@@ -393,6 +415,7 @@ fn main() -> anyhow::Result<()> {
         && opt.example.is_none()
         && opt.test.is_none()
         && opt.unit_test.is_none()
+        && opt.unit_bench.is_none()
     {
         let target = find_unique_target(
             &["bin"],
@@ -411,6 +434,16 @@ fn main() -> anyhow::Result<()> {
             unit_test.as_deref(),
         )?;
         opt.unit_test = Some(Some(target.target));
+        opt.package = Some(target.package);
+        target.kind
+    } else if let Some(unit_bench) = opt.unit_bench {
+        let target = find_unique_target(
+            &["bin", "lib"],
+            opt.package.as_deref(),
+            opt.manifest_path.as_deref(),
+            unit_bench.as_deref(),
+        )?;
+        opt.unit_bench = Some(Some(target.target));
         opt.package = Some(target.package);
         target.kind
     } else {
