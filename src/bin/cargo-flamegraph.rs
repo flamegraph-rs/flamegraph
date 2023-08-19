@@ -24,6 +24,10 @@ struct Opt {
     #[clap(short, long, group = "exec-args")]
     bin: Option<String>,
 
+    /// Build for the target triple
+    #[clap(long, group = "exec-args")]
+    target: Option<String>,
+
     /// Example to run
     #[clap(long, group = "exec-args")]
     example: Option<String>,
@@ -109,6 +113,11 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     if let Some(ref bin) = opt.bin {
         cmd.arg("--bin");
         cmd.arg(bin);
+    }
+
+    if let Some(ref target) = opt.target {
+        cmd.arg("--target");
+        cmd.arg(target);
     }
 
     if let Some(ref example) = opt.example {
