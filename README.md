@@ -105,7 +105,7 @@ cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
 
 # Run criterion benchmark
 # Note that the last --bench is required for `criterion 0.3` to run in benchmark mode, instead of test mode.
-cargo flamegraph --bench some_benchmark --features some_features -- --bench`
+cargo flamegraph --bench some_benchmark --features some_features -- --bench
 
 cargo flamegraph --example some_example --features some_features
 
