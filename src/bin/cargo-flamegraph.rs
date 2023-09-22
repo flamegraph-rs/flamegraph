@@ -36,14 +36,16 @@ struct Opt {
     #[clap(long, group = "exec-args")]
     test: Option<String>,
 
-    /// Crate target to unit test, <unit-test> may be omitted if crate only has one target
-    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// Crate target to unit test, <unit-test> may be omitted if the crate's library is targeted. To
+    /// target a binary, it name must be specifed.
+    /// (currently profiles the test harness and all tests in the library/binary; test selection
     /// can be passed as trailing arguments after `--` as separator)
     #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
 
-    /// Crate target to unit benchmark, <bench> may be omitted if crate only has one target
-    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// Crate target to unit benchmark, <bench> may be omitted if the crate's library is targeted. To
+    /// target a binary, it name must be specifed.
+    /// (currently profiles the test harness and all tests in the library/binary; test selection
     /// can be passed as trailing arguments after `--` as separator)
     #[clap(long, group = "exec-args")]
     unit_bench: Option<Option<String>>,
@@ -436,8 +438,13 @@ fn main() -> anyhow::Result<()> {
         opt.package = Some(target.package);
         target.kind
     } else if let Some(unit_test) = opt.unit_test {
+        let kind = if unit_test.is_some() {
+            &["bin"]
+        } else {
+            &["lib"]
+        };
         let target = find_unique_target(
-            &["bin", "lib"],
+            kind,
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_test.as_deref(),
@@ -446,8 +453,13 @@ fn main() -> anyhow::Result<()> {
         opt.package = Some(target.package);
         target.kind
     } else if let Some(unit_bench) = opt.unit_bench {
+        let kind = if unit_bench.is_some() {
+            &["bin"]
+        } else {
+            &["lib"]
+        };
         let target = find_unique_target(
-            &["bin", "lib"],
+            kind,
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_bench.as_deref(),
