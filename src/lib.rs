@@ -41,7 +41,7 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: bool,
+        sudo: Option<Option<String>>,
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
@@ -49,8 +49,11 @@ mod arch {
     ) -> Option<String> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
 
-        let mut command = if sudo {
+        let mut command = if let Some(sudo) = sudo {
             let mut c = Command::new("sudo");
+            if let Some(sudo_args) = sudo {
+                c.arg(sudo_args);
+            }
             c.arg(perf);
             c
         } else {
