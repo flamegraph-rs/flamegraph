@@ -41,7 +41,7 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: bool,
+        sudo: Option<Option<String>>,
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
@@ -49,8 +49,11 @@ mod arch {
     ) -> Option<String> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
 
-        let mut command = if sudo {
+        let mut command = if let Some(sudo) = sudo {
             let mut c = Command::new("sudo");
+            if let Some(sudo_args) = sudo {
+                c.arg(sudo_args);
+            }
             c.arg(perf);
             c
         } else {
@@ -148,7 +151,7 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: bool,
+        sudo: Option<Option<String>>,
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
@@ -156,8 +159,11 @@ mod arch {
     ) -> Option<String> {
         let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
 
-        let mut command = if sudo {
+        let mut command = if let Some(sudo) = sudo {
             let mut c = Command::new("sudo");
+            if let Some(sudo_args) = sudo {
+                c.arg(sudo_args);
+            }
             c.arg(&dtrace);
             c
         } else {
@@ -332,6 +338,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
+    let use_sudo = opts.root.is_some();
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
@@ -348,7 +355,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     #[cfg(unix)]
     signal_hook::low_level::unregister(handler);
 
-    let output = arch::output(perf_output, opts.script_no_inline, opts.root)?;
+    let output = arch::output(perf_output, opts.script_no_inline, use_sudo)?;
 
     let perf_reader = BufReader::new(&*output);
 
@@ -451,9 +458,9 @@ pub struct Options {
     #[clap(long)]
     open: bool,
 
-    /// Run with root privileges (using `sudo`)
-    #[clap(long)]
-    root: bool,
+    /// Run with root privileges (using `sudo`). Accepts an optional argument containing command line options which will be passed to sudo
+    #[clap(long, value_name = "SUDO FLAGS")]
+    root: Option<Option<String>>,
 
     /// Sampling frequency
     #[clap(short = 'F', long = "freq")]
