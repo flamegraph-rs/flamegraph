@@ -7,7 +7,12 @@ description = "A simple cargo subcommand for generating flamegraphs, using infer
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/flamegraph-rs/flamegraph"
 keywords = ["perf", "flamegraph", "profiling", "cargo", "cargo-subcommand"]
-categories = ["command-line-utilities", "development-tools::profiling", "visualization", "development-tools::cargo-plugins"]
+categories = [
+    "command-line-utilities",
+    "development-tools::profiling",
+    "visualization",
+    "development-tools::cargo-plugins",
+]
 readme = "README.md"
 
 [[bin]]
@@ -23,7 +28,10 @@ anyhow = "1.0.43"
 cargo_metadata = "0.18"
 clap = { version = "4.0.11", features = ["derive"] }
 clap_complete = "4.0.2"
-inferno = { version = "0.11.0", default_features = false, features = ["multithreaded", "nameattr"] }
+inferno = { version = "0.11.19", default_features = false, features = [
+    "multithreaded",
+    "nameattr",
+] }
 opener = "0.6.0"
 shlex = "1.1.0"
 
