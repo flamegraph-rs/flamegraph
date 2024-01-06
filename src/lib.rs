@@ -41,24 +41,14 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: Option<Option<String>>,
+        sudo: Option<Option<&str>>,
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
     ) -> Option<String> {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
-
-        let mut command = if let Some(sudo) = sudo {
-            let mut c = Command::new("sudo");
-            if let Some(sudo_args) = sudo {
-                c.arg(sudo_args);
-            }
-            c.arg(perf);
-            c
-        } else {
-            Command::new(perf)
-        };
+        let mut command = sudo_command(&perf, sudo);
 
         let args = custom_cmd.unwrap_or(format!(
             "record -F {} --call-graph dwarf,16384 -g",
@@ -99,26 +89,18 @@ mod arch {
     pub fn output(
         perf_output: Option<String>,
         script_no_inline: bool,
-        sudo: bool,
+        sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
-        if sudo {
-            // We executed `perf record` with sudo, and will be executing `perf script` *without* sudo.
-            // Ensure the perf.data file is readable by the current user, so that `perf script` can
-            // read it.
-            if let Ok(user) = env::var("USER") {
-                Command::new("sudo")
-                    .args(["chown", user.as_str(), "perf.data"])
-                    .spawn()
-                    .expect(arch::SPAWN_ERROR)
-                    .wait()
-                    .expect(arch::WAIT_ERROR);
-            }
-        }
-
+        // We executed `perf record` with sudo, and will be executing `perf script` with sudo,
+        // so that we can resolve privileged kernel symbols from /proc/kallsyms.
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
-        let mut command = Command::new(perf);
+        let mut command = sudo_command(&perf, sudo);
 
         command.arg("script");
+
+        // Force reading perf.data owned by another uid if it happened to be created earlier.
+        command.arg("--force");
+
         if script_no_inline {
             command.arg("--no-inline");
         }
@@ -151,24 +133,14 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: Option<Option<String>>,
+        sudo: Option<Option<&str>>,
         freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
     ) -> Option<String> {
         let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
-
-        let mut command = if let Some(sudo) = sudo {
-            let mut c = Command::new("sudo");
-            if let Some(sudo_args) = sudo {
-                c.arg(sudo_args);
-            }
-            c.arg(&dtrace);
-            c
-        } else {
-            Command::new(&dtrace)
-        };
+        let mut command = sudo_command(&dtrace, sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
             "profile-{} /pid == $target/ \
@@ -243,7 +215,7 @@ mod arch {
     pub fn output(
         _: Option<String>,
         script_no_inline: bool,
-        sudo: bool,
+        sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
             return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
@@ -251,7 +223,7 @@ mod arch {
 
         // Ensure the file is readable by the current user if dtrace was run
         // with sudo.
-        if sudo {
+        if sudo.is_some() {
             #[cfg(unix)]
             if let Ok(user) = env::var("USER") {
                 Command::new("sudo")
@@ -290,6 +262,20 @@ mod arch {
 
         Ok(reencoded_buf)
     }
+}
+
+fn sudo_command(command: &str, sudo: Option<Option<&str>>) -> Command {
+    let sudo = match sudo {
+        Some(sudo) => sudo,
+        None => return Command::new(command),
+    };
+
+    let mut c = Command::new("sudo");
+    if let Some(sudo_args) = sudo {
+        c.arg(sudo_args);
+    }
+    c.arg(command);
+    c
 }
 
 fn run(mut command: Command, verbose: bool, ignore_status: bool) {
@@ -338,13 +324,14 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    let use_sudo = opts.root.is_some();
+    let sudo = opts.root.as_ref().map(|inner| inner.as_deref());
+
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
         arch::initial_command(
             workload,
-            opts.root,
+            sudo,
             opts.frequency,
             opts.custom_cmd,
             opts.verbose,
@@ -355,7 +342,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     #[cfg(unix)]
     signal_hook::low_level::unregister(handler);
 
-    let output = arch::output(perf_output, opts.script_no_inline, use_sudo)?;
+    let output = arch::output(perf_output, opts.script_no_inline, sudo)?;
 
     let perf_reader = BufReader::new(&*output);
 
