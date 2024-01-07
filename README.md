@@ -71,7 +71,7 @@ flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_
 
 ## Examples
 
-```
+```bash
 # if you'd like to profile an arbitrary executable:
 flamegraph [-o my_flamegraph.svg] -- /path/to/my/binary --my-arg 5
 
