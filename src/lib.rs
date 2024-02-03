@@ -1,3 +1,4 @@
+use std::io::Cursor;
 use std::{
     env,
     fs::File,
@@ -122,6 +123,52 @@ mod arch {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn wrapper_arch_hint_for_binary(binary: &String) -> anyhow::Result<String> {
+    // MacOS binaries can be for one or several ("universal") hardware architectures.
+    // When attaching a tracer like dtrace to a binary, it's important to try to make sure that the tracer and binary
+    // are of the native CPU architecture if possible (so e.g. tracer symbol libraries preinstalled on the OS can be
+    // used when tracing), and even if not, that the tracer and target binary share the same architecture.
+    // This function makes a best-effort attempt to determine the architecture of the target binary, and returns a
+    // "hint" architecture name string to indicate what architecture of tracer should be preferred when invoking dtrace.
+    // If identifying the target binary's architecture fails (e.g. because the target isn't a binary, or isn't readable
+    // without root privileges), or if none of the target's architectures match the host's native architecture,
+    // tracing won't necessarily fail, it's just more likely to. As a result, we don't abort the trace attempt if we
+    // can't get tracer_arch == target_arch == host_arch, we just emit a warning and proceed.
+    // The best-effort heuristic we use is:
+    // 1. If the native arch is supported by the binary, hint that MacOS (and thus dtrace/sudo) should prefer that.
+    // 2. Otherwise, if the binary supports only a single arch, hint that.
+    // 3. Otherwise, hint nothing and warn.
+    use mach_object::{get_arch_name_from_types, OFile};
+    let mut cur = Cursor::new(std::fs::read(binary)?);
+    let machfile = OFile::parse(&mut cur)?;
+    let archs: Vec<&str> = match machfile {
+        OFile::MachFile { header, .. } => vec![(header.cputype, header.cpusubtype)],
+        OFile::FatFile { files, .. } => files
+            .iter()
+            .map(|(arch, _)| (arch.cputype, arch.cpusubtype))
+            .collect::<Vec<(i32, i32)>>(),
+        // If it's an archive or symbol table, give up (it probably isn't traceable anyway, but let dtrace decide that).
+        _ => return Err(anyhow::anyhow!("could not parse mach-o file")),
+    }
+    .iter()
+    .map(|(cputype, cpusubtype)| get_arch_name_from_types(*cputype, *cpusubtype).unwrap())
+    .collect();
+    let sysinfo = uname::Info::new()?;
+    let native_arch = sysinfo.machine.as_str();
+
+    if archs.contains(&native_arch) {
+        Ok(native_arch.into())
+    } else {
+        println!("binary architecture {} does not match system architecture {}; tracing may fail", archs.join(","), native_arch);
+        if archs.len() == 1 {
+            Ok(archs[0].into())
+        } else {
+            Err(anyhow::anyhow!("multiple architectures found: {}. Probably a universal binary, not hinting arch", archs.join(",")))
+        }
+    }
+}
+
 #[cfg(not(target_os = "linux"))]
 mod arch {
     use super::*;
@@ -163,6 +210,16 @@ mod arch {
                 for (i, arg) in c.iter().enumerate() {
                     if i > 0 {
                         escaped.push(' ');
+                    } else if cfg!(target_os = "macos") {
+                        // If users want to bypass the whole arch-preference-detection heuristic process, they can
+                        // manually set ARCHPREFERENCE to the variable they'd like to hint dtrace/sudo to use, per the
+                        // syntax supported by MacOS: https://www.unix.com/man-page/osx/1/arch/
+                        if let Err(_) = env::var("ARCHPREFERENCE") {
+                            match wrapper_arch_hint_for_binary(arg) {
+                                Ok(arch_hint) => { command.env("ARCHPREFERENCE", arch_hint); },
+                                Err(error) => println!("{}: warning: hinting subcommand architecture preference failed: {}", arg, error)
+                            };
+                        }
                     }
                     escaped.push_str(&arg.replace(' ', "\\ "));
                 }
