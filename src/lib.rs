@@ -147,11 +147,7 @@ mod arch {
         let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
         if let Ok(sysinfo) = uname::uname() {
             let mut command = sudo_command("arch", sudo);
-            command.args([
-                "-arch".into(),
-                sysinfo.machine,
-                dtrace,
-            ]);
+            command.args(["-arch".into(), sysinfo.machine, dtrace]);
             command
         } else {
             sudo_command(&dtrace, sudo)
