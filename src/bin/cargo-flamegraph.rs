@@ -463,7 +463,7 @@ fn main() -> anyhow::Result<()> {
     if let None = opt.graph.root {
         return Err(anyhow!(
             "DTrace requires elevated permissions on MacOS; re-invoke using 'cargo flamegraph --root ...'",
-        ))
+        ));
     }
 
     let artifacts = build(&opt, kind)?;
