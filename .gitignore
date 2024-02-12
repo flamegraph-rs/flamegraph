@@ -3,7 +3,7 @@
 *svg
 perf*
 
-# IntelliJ IDE files:
+# IntelliJ IDE files
 .idea/
 # MacOS desktop layout files
 .DS_Store

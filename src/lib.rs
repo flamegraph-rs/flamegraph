@@ -138,8 +138,8 @@ mod arch {
         // If the flamegraph binary, or the cargo binary, have been compiled as x86, this can cause all tracing to fail.
         // To work around that, we unconditionally wrap dtrace on MacOS in the "arch -64/-32" wrapper so it's always
         // running in the native architecture matching the bit width (32 oe 64) with which "flamegraph" was compiled.
-        // NOTE that dtrace-as-x86 won't trace a deliberately-cross-compiled x86 binary regardless of "arch" wrapping;
-        // attempts to do that will always fail with "DTrace cannot instrument translated processes".
+        // NOTE that dtrace-as-x86 won't trace a deliberately-cross-compiled x86 binary running under Rosetta regardless
+        // of "arch" wrapping; attempts to do that will fail with "DTrace cannot instrument translated processes".
         // NOTE that using the ARCHPREFERENCE environment variable documented here
         // (https://www.unix.com/man-page/osx/1/arch/) would be a much simpler solution to this issue, but it does not
         // seem to have any effect on dtrace when set (via Command::env, shell export, or std::env in the spawning
@@ -201,7 +201,7 @@ mod arch {
 
                 #[cfg(target_os = "windows")]
                 {
-                    let mut help_test = Command::new(&dtrace);
+                    let mut help_test = crate::arch::base_dtrace_command(None);
 
                     let dtrace_found = help_test
                         .arg("--help")
