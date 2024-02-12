@@ -475,7 +475,7 @@ pub struct Options {
 
     /// Run with root privileges (using `sudo`). Accepts an optional argument containing command line options which will be passed to sudo
     #[clap(long, value_name = "SUDO FLAGS")]
-    root: Option<Option<String>>,
+    pub root: Option<Option<String>>,
 
     /// Sampling frequency
     #[clap(short = 'F', long = "freq")]

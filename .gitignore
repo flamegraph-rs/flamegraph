@@ -5,5 +5,5 @@ perf*
 
 # IntelliJ IDE files:
 .idea/
-# MacOS cruft:
+# MacOS desktop layout files
 .DS_Store
