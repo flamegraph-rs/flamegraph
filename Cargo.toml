@@ -26,7 +26,6 @@ clap_complete = "4.0.2"
 inferno = { version = "0.11.0", default_features = false, features = ["multithreaded", "nameattr"] }
 opener = "0.6.0"
 shlex = "1.1.0"
-uname = "0.1.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"

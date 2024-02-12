@@ -136,22 +136,23 @@ mod arch {
         // If DTrace is spawned from a parent process (or grandparent process etc.) running in Rosetta-emulated x86 mode
         // on an ARM mac, it will fail to trace the child process with a confusing syntax error in its stdlib .d file.
         // If the flamegraph binary, or the cargo binary, have been compiled as x86, this can cause all tracing to fail.
-        // To work around that, we unconditionally wrap dtrace on MacOS in the "arch -arch arm64" wrapper so it's always
-        // running in native mode.
+        // To work around that, we unconditionally wrap dtrace on MacOS in the "arch -64/-32" wrapper so it's always
+        // running in the native architecture matching the bit width (32 oe 64) with which "flamegraph" was compiled.
         // NOTE that dtrace-as-x86 won't trace a deliberately-cross-compiled x86 binary regardless of "arch" wrapping;
         // attempts to do that will always fail with "DTrace cannot instrument translated processes".
         // NOTE that using the ARCHPREFERENCE environment variable documented here
         // (https://www.unix.com/man-page/osx/1/arch/) would be a much simpler solution to this issue, but it does not
         // seem to have any effect on dtrace when set (via Command::env, shell export, or std::env in the spawning
         // process).
-        let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
-        if let Ok(sysinfo) = uname::uname() {
-            let mut command = sudo_command("arch", sudo);
-            command.args(["-arch".into(), sysinfo.machine, dtrace]);
-            command
-        } else {
-            sudo_command(&dtrace, sudo)
-        }
+        let mut command = sudo_command("arch", sudo);
+
+        #[cfg(target_pointer_width = "64")]
+        command.arg("-64".to_string());
+        #[cfg(target_pointer_width = "32")]
+        command.arg("-32".to_string());
+
+        command.arg(env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string()));
+        command
     }
 
     #[cfg(not(target_os = "macos"))]
