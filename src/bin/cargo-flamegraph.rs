@@ -459,6 +459,13 @@ fn main() -> anyhow::Result<()> {
         Vec::new()
     };
 
+    #[cfg(target_os = "macos")]
+    if let None = opt.graph.root {
+        return Err(anyhow!(
+            "DTrace requires elevated permissions on MacOS; re-invoke using 'cargo flamegraph --root ...'",
+        ));
+    }
+
     let artifacts = build(&opt, kind)?;
     let workload = workload(&opt, &artifacts)?;
     flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph)

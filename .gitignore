@@ -2,3 +2,6 @@
 **/*.rs.bk
 *svg
 perf*
+
+# IntelliJ IDE files
+.idea/
