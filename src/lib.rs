@@ -393,7 +393,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
         let mut child = Command::new(
             command_vec
-                .get(0)
+                .first()
                 .ok_or_else(|| anyhow!("unable to parse post-process command"))?,
         )
         .args(command_vec.get(1..).unwrap_or(&[]))
