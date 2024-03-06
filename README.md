@@ -146,7 +146,7 @@ Options:
   -o, --output <OUTPUT>                Output file [default: flamegraph.svg]
       --open                           Open the output .svg file with default program
       --root                           Run with root privileges (using `sudo`)
-  -F, --freq <FREQUENCY>               Sampling frequency in Hz
+  -F, --freq <FREQUENCY>               Sampling frequency in Hz [default: 997]
   -c, --cmd <CUSTOM_CMD>               Custom command for invoking perf/dtrace
       --deterministic                  Colors are selected such that the color of a function does not change between runs
   -i, --inverted                       Plot the flame graph up-side-down
