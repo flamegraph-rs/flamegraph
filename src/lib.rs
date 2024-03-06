@@ -42,7 +42,7 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: Option<u32>,
+        freq: u32,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
@@ -50,10 +50,7 @@ mod arch {
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
         let mut command = sudo_command(&perf, sudo);
 
-        let args = custom_cmd.unwrap_or(format!(
-            "record -F {} --call-graph dwarf,16384 -g",
-            freq.unwrap_or(997)
-        ));
+        let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,16384 -g"));
 
         let mut perf_output = None;
         let mut args = args.split_whitespace();
@@ -164,7 +161,7 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: Option<u32>,
+        freq: u32,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
@@ -172,9 +169,8 @@ mod arch {
         let mut command = base_dtrace_command(sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
-            "profile-{} /pid == $target/ \
+            "profile-{freq} /pid == $target/ \
              {{ @[ustack(100)] = count(); }}",
-            freq.unwrap_or(997)
         ));
 
         command.arg("-x");
@@ -361,7 +357,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
         arch::initial_command(
             workload,
             sudo,
-            opts.frequency,
+            opts.frequency(),
             opts.custom_cmd,
             opts.verbose,
             opts.ignore_status,
@@ -513,6 +509,10 @@ impl Options {
             )),
             false => Ok(()),
         }
+    }
+
+    pub fn frequency(&self) -> u32 {
+        self.frequency.unwrap_or(997)
     }
 }
 
