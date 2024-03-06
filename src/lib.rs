@@ -478,7 +478,7 @@ pub struct Options {
     #[clap(long, value_name = "SUDO FLAGS")]
     pub root: Option<Option<String>>,
 
-    /// Sampling frequency
+    /// Sampling frequency in Hz
     #[clap(short = 'F', long = "freq")]
     frequency: Option<u32>,
 
