@@ -111,8 +111,8 @@ cargo flamegraph --example some_example --features some_features
 
 # Profile unit tests.
 # Note that a separating `--` is necessary if `--unit-test` is the last flag.
-cargo flamegraph --unit-test -- test::in::package::with::single::crate
-cargo flamegraph --unit-test crate_name -- test::in::package::with::multiple:crate
+cargo flamegraph --unit-test -- test::library::in::package
+cargo flamegraph --unit-test crate_name -- test::binary::in::package
 cargo flamegraph --unit-test --dev test::may::omit::separator::if::unit::test::flag::not::last::flag
 
 # Profile integration tests.
