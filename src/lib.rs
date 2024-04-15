@@ -50,10 +50,7 @@ mod arch {
         let perf = if let Ok(path) = env::var("PERF") {
             path
         } else {
-            if Command::new("perf")
-                .arg("--help")
-                .status().is_err()
-            {
+            if Command::new("perf").arg("--help").status().is_err() {
                 eprintln!("perf is not installed or not present in $PATH");
                 exit(1);
             }
