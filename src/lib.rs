@@ -47,7 +47,16 @@ mod arch {
         verbose: bool,
         ignore_status: bool,
     ) -> Option<String> {
-        let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
+        let perf = if let Ok(path) = env::var("PERF") {
+            path
+        } else {
+            if Command::new("perf").arg("--help").status().is_err() {
+                eprintln!("perf is not installed or not present in $PATH");
+                exit(1);
+            }
+
+            String::from("perf")
+        };
         let mut command = sudo_command(&perf, sudo);
 
         let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,16384 -g"));
