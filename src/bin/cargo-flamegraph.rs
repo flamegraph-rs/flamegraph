@@ -6,6 +6,13 @@ use clap::{Args, Parser};
 
 use flamegraph::Workload;
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[clap(rename_all = "snake_case")]
+enum UnitTestTargetKind {
+    Bin,
+    Lib,
+}
+
 #[derive(Args, Debug)]
 struct Opt {
     /// Build with the dev profile
@@ -41,6 +48,11 @@ struct Opt {
     /// can be passed as trailing arguments after `--` as separator)
     #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
+
+    /// Kind of target (lib or bin) when running with <unit-test> which is may be
+    /// required when we have two targets with the same name.
+    #[clap(long)]
+    unit_test_kind: Option<UnitTestTargetKind>,
 
     /// Crate target to unit benchmark, <bench> may be omitted if crate only has one target
     /// (currently profiles the test harness and all tests in the binary; test selection
@@ -436,8 +448,14 @@ fn main() -> anyhow::Result<()> {
         opt.package = Some(target.package);
         target.kind
     } else if let Some(unit_test) = opt.unit_test {
+        let kinds = match opt.unit_test_kind {
+            Some(UnitTestTargetKind::Bin) => &["bin"][..], // get slice to help type inference
+            Some(UnitTestTargetKind::Lib) => &["lib"],
+            None => &["bin", "lib"],
+        };
+
         let target = find_unique_target(
-            &["bin", "lib"],
+            kinds,
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_test.as_deref(),
