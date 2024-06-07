@@ -8,12 +8,14 @@ not just Rust projects! No perl or pipes required <3
 
 How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
-Relies on perf on linux and dtrace otherwise. Built on top of
-[@jonhoo's](https://github.com/jonhoo)
-wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust
-flamegraph generation library!
+> [!TIP]
+> You might want to also try [samply](https://github.com/mstange/samply), which provides a more interactive UI
+> using a seamless integration with Firefox's Profiler web UI. It is also written in Rust and has better macOS support.
 
-Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
+Relies on perf on linux and dtrace otherwise. Built on top of [@jonhoo's](https://github.com/jonhoo)
+wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust flamegraph generation library!
+Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902),
+so if you try this out please let us know how it goes. :D
 
 **Note**: If you're using lld on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example
 
