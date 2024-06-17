@@ -527,6 +527,14 @@ impl Options {
 
 #[derive(Debug, Args)]
 pub struct FlamegraphOptions {
+    /// Set title text in SVG
+    #[clap(long, value_name = "STRING")]
+    pub title: Option<String>,
+
+    /// Set second level title text in SVG
+    #[clap(long, value_name = "STRING")]
+    pub subtitle: Option<String>,
+
     /// Colors are selected such that the color of a function does not change between runs
     #[clap(long)]
     pub deterministic: bool,
@@ -571,6 +579,10 @@ pub struct FlamegraphOptions {
 impl FlamegraphOptions {
     pub fn into_inferno(self) -> inferno::flamegraph::Options<'static> {
         let mut options = inferno::flamegraph::Options::default();
+        if let Some(title) = self.title {
+            options.title = title;
+        }
+        options.subtitle = self.subtitle;
         options.deterministic = self.deterministic;
         if self.inverted {
             options.direction = inferno::flamegraph::Direction::Inverted;
