@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::anyhow;
+use anyhow::bail;
 use clap::{CommandFactory, Parser};
 use clap_complete::Shell;
 
@@ -46,11 +46,20 @@ fn main() -> anyhow::Result<()> {
         let path = perf_file.to_str().unwrap();
         Workload::ReadPerf(path.to_string())
     } else {
-        match (opt.pid, opt.trailing_arguments.is_empty()) {
-            (Some(p), true) => Workload::Pid(p),
-            (None, false) => Workload::Command(opt.trailing_arguments.clone()),
-            (Some(_), false) => return Err(anyhow!("cannot pass in command with --pid")),
-            (None, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+        match (
+            opt.pid,
+            opt.graph.global(),
+            opt.trailing_arguments.is_empty(),
+        ) {
+            (Some(_), _, false) => bail!("cannot pass in command with --pid"),
+            (Some(_), true, _) => bail!("cannot specify both --global and --pid"),
+            (_, true, false) => bail!("cannot pass in command with --global"),
+
+            (Some(p), false, true) => Workload::Pid(p),
+            (None, false, false) => Workload::Command(opt.trailing_arguments.clone()),
+            (None, true, true) => Workload::Global,
+
+            (None, false, true) => bail!("no workload given to generate a flamegraph for"),
         }
     };
     flamegraph::generate_flamegraph_for_workload(workload, opt.graph)

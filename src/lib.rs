@@ -19,7 +19,7 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::{
     builder::{PossibleValuesParser, TypedValueParser},
     Args,
@@ -30,6 +30,7 @@ pub enum Workload {
     Command(Vec<String>),
     Pid(u32),
     ReadPerf(String),
+    Global,
 }
 
 #[cfg(target_os = "linux")]
@@ -42,11 +43,13 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: u32,
-        custom_cmd: Option<String>,
-        verbose: bool,
-        ignore_status: bool,
+        opts: &Options,
     ) -> Option<String> {
+        let freq = opts.frequency();
+        let custom_cmd = opts.custom_cmd.clone();
+        let verbose = opts.verbose;
+        let ignore_status = opts.ignore_status;
+
         let perf = if let Ok(path) = env::var("PERF") {
             path
         } else {
@@ -77,7 +80,16 @@ mod arch {
             }
         }
 
+        // This is checked earlier in Options::check
+        if opts.kernel {
+            unimplemented!("kernel sampling is not implemented using perf");
+        }
+
         match workload {
+            Workload::Global => {
+                // This is also checked earlier in Options::check
+                unimplemented!("global sampling is not implemented using perf")
+            }
             Workload::Command(c) => {
                 command.args(&c);
             }
@@ -118,7 +130,7 @@ mod arch {
 
         let output = command.output().context("unable to call perf script")?;
         if !output.status.success() {
-            anyhow::bail!(format!(
+            bail!(format!(
                 "unable to run 'perf script': ({}) {}",
                 output.status,
                 std::str::from_utf8(&output.stderr)?
@@ -170,20 +182,44 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: u32,
-        custom_cmd: Option<String>,
-        verbose: bool,
-        ignore_status: bool,
+        opts: &Options,
     ) -> Option<String> {
+        let freq = opts.frequency();
+        let custom_cmd = opts.custom_cmd.clone();
+        let global = opts.global;
+        let kernel = opts.kernel;
+        let verbose = opts.verbose;
+        let ignore_status = opts.ignore_status;
+
         let mut command = base_dtrace_command(sudo);
 
+        let stack = if kernel {
+            "stack(100),ustack(100)"
+        } else {
+            "ustack(100)"
+        };
+        let filter = if global { "" } else { "/pid == $target/" };
+
         let dtrace_script = custom_cmd.unwrap_or(format!(
-            "profile-{freq} /pid == $target/ \
-             {{ @[ustack(100)] = count(); }}",
+            "profile-{freq} {filter}  \
+             {{ @[{stack}] = count(); }}",
         ));
 
         command.arg("-x");
         command.arg("ustackframes=100");
+
+        // Adjust the max number of saved process handles, to avoid having to
+        // constantly reload symbol tables.
+        #[cfg(target_os = "illumos")]
+        if global {
+            command.arg("-x");
+            command.arg("pgmax=1024");
+        }
+
+        if kernel {
+            command.arg("-x");
+            command.arg("stackframes=100");
+        }
 
         command.arg("-n");
         command.arg(&dtrace_script);
@@ -192,6 +228,7 @@ mod arch {
         command.arg("cargo-flamegraph.stacks");
 
         match workload {
+            Workload::Global => (),
             Workload::Command(c) => {
                 let mut escaped = String::new();
                 for (i, arg) in c.iter().enumerate() {
@@ -363,14 +400,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
-        arch::initial_command(
-            workload,
-            sudo,
-            opts.frequency(),
-            opts.custom_cmd,
-            opts.verbose,
-            opts.ignore_status,
-        )
+        arch::initial_command(workload, sudo, &opts)
     };
 
     #[cfg(unix)]
@@ -506,22 +536,47 @@ pub struct Options {
     /// stdout.
     #[clap(long)]
     post_process: Option<String>,
+
+    /// Capture a trace of the entire system
+    #[clap(long)]
+    global: bool,
+
+    /// Include kernel stack frames
+    #[clap(long)]
+    kernel: bool,
 }
 
 impl Options {
     pub fn check(&self) -> anyhow::Result<()> {
         // Manually checking conflict because structopts `conflicts_with` leads
         // to a panic in completion generation for zsh at the moment (see #158)
-        match self.frequency.is_some() && self.custom_cmd.is_some() {
-            true => Err(anyhow!(
-                "Cannot pass both a custom command and a frequency."
-            )),
-            false => Ok(()),
+        if self.custom_cmd.is_some() {
+            if self.frequency.is_some() {
+                bail!("Cannot pass both a custom command and a frequency.")
+            } else if self.global {
+                bail!("Cannot specify global tracing when a custom command is also provided");
+            } else if self.kernel {
+                bail!("Cannot specify kernel tracing when a custom command is also provided");
+            }
         }
+
+        if cfg!(target_os = "linux") {
+            if self.global {
+                bail!("Global tracing is only supported using DTrace backend");
+            } else if self.kernel {
+                bail!("Kernel tracing is only supported using DTrace backend");
+            }
+        }
+
+        Ok(())
     }
 
     pub fn frequency(&self) -> u32 {
         self.frequency.unwrap_or(997)
+    }
+
+    pub fn global(&self) -> bool {
+        self.global
     }
 }
 
