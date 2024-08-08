@@ -8,19 +8,29 @@ not just Rust projects! No perl or pipes required <3
 
 How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
-Relies on perf on linux and dtrace otherwise. Built on top of
-[@jonhoo's](https://github.com/jonhoo)
-wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust
-flamegraph generation library!
+> [!TIP]
+> You might want to also try [samply](https://github.com/mstange/samply), which provides a more interactive UI
+> using a seamless integration with Firefox's Profiler web UI. It is also written in Rust and has better macOS support.
 
-Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902), so if you try this out please let us know how it goes :D
+Relies on perf on linux and dtrace otherwise. Built on top of [@jonhoo's](https://github.com/jonhoo)
+wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust flamegraph generation library!
+Windows is getting [dtrace support](https://techcommunity.microsoft.com/t5/Windows-Kernel-Internals/DTrace-on-Windows/ba-p/362902),
+so if you try this out please let us know how it goes. :D
 
-**Note**: If you're using lld on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example
+**Note**: If you're using lld or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example, for lld:
 
 ```toml
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"
 rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
+```
+
+and for mold:
+
+```toml
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-Clink-arg=-fuse-ld=/usr/local/bin/mold", "-Clink-arg=-Wl,--no-rosegment"]
 ```
 
 ## Installation
@@ -71,7 +81,7 @@ flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_
 
 ## Examples
 
-```
+```bash
 # if you'd like to profile an arbitrary executable:
 flamegraph [-o my_flamegraph.svg] -- /path/to/my/binary --my-arg 5
 
@@ -105,7 +115,7 @@ cargo flamegraph -c "record -e branch-misses -c 100 --call-graph lbr -g"
 
 # Run criterion benchmark
 # Note that the last --bench is required for `criterion 0.3` to run in benchmark mode, instead of test mode.
-cargo flamegraph --bench some_benchmark --features some_features -- --bench`
+cargo flamegraph --bench some_benchmark --features some_features -- --bench
 
 cargo flamegraph --example some_example --features some_features
 
@@ -146,7 +156,7 @@ Options:
   -o, --output <OUTPUT>                Output file [default: flamegraph.svg]
       --open                           Open the output .svg file with default program
       --root                           Run with root privileges (using `sudo`)
-  -F, --freq <FREQUENCY>               Sampling frequency
+  -F, --freq <FREQUENCY>               Sampling frequency in Hz [default: 997]
   -c, --cmd <CUSTOM_CMD>               Custom command for invoking perf/dtrace
       --deterministic                  Colors are selected such that the color of a function does not change between runs
   -i, --inverted                       Plot the flame graph up-side-down
@@ -182,8 +192,9 @@ echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 ### DTrace on macOS
 
 On macOS, there is no alternative to running as superuser in order to
-enable dtrace. The simplest way is to use `--root`, this way `rustc`
-will be run normally but the binary will get run as superuser.
+enable DTrace. This should be done by invoking `sudo flamegraph ...` or
+`cargo flamegraph --root ...`. Do not do `sudo cargo flamegraph ...`;
+this can cause problems due to Cargo's build system being run as root.
 
 Be aware that if the binary being tested is user-aware, this does
 change its behaviour.

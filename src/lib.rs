@@ -4,6 +4,7 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
+    str::FromStr,
 };
 
 #[cfg(unix)]
@@ -19,12 +20,19 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 use signal_hook::consts::{SIGINT, SIGTERM};
 
 use anyhow::{anyhow, Context};
-use clap::Args;
+use clap::{
+    builder::{PossibleValuesParser, TypedValueParser},
+    Args,
+};
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 
+/// Mode of operation.
 pub enum Workload {
+    /// Execute an executable with the given command and arguments.
     Command(Vec<String>),
+    /// Profile a running process with the given PID.
     Pid(u32),
+    /// Read profiling data from a file.
     ReadPerf(String),
 }
 
@@ -37,26 +45,25 @@ mod arch {
 
     pub(crate) fn initial_command(
         workload: Workload,
-        sudo: bool,
-        freq: Option<u32>,
+        sudo: Option<Option<&str>>,
+        freq: u32,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
     ) -> Option<String> {
-        let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
-
-        let mut command = if sudo {
-            let mut c = Command::new("sudo");
-            c.arg(perf);
-            c
+        let perf = if let Ok(path) = env::var("PERF") {
+            path
         } else {
-            Command::new(perf)
-        };
+            if Command::new("perf").arg("--help").status().is_err() {
+                eprintln!("perf is not installed or not present in $PATH");
+                exit(1);
+            }
 
-        let args = custom_cmd.unwrap_or(format!(
-            "record -F {} --call-graph dwarf,16384 -g",
-            freq.unwrap_or(997)
-        ));
+            String::from("perf")
+        };
+        let mut command = sudo_command(&perf, sudo);
+
+        let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,16384 -g"));
 
         let mut perf_output = None;
         let mut args = args.split_whitespace();
@@ -92,26 +99,18 @@ mod arch {
     pub fn output(
         perf_output: Option<String>,
         script_no_inline: bool,
-        sudo: bool,
+        sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
-        if sudo {
-            // We executed `perf record` with sudo, and will be executing `perf script` *without* sudo.
-            // Ensure the perf.data file is readable by the current user, so that `perf script` can
-            // read it.
-            if let Ok(user) = env::var("USER") {
-                Command::new("sudo")
-                    .args(["chown", user.as_str(), "perf.data"])
-                    .spawn()
-                    .expect(arch::SPAWN_ERROR)
-                    .wait()
-                    .expect(arch::WAIT_ERROR);
-            }
-        }
-
+        // We executed `perf record` with sudo, and will be executing `perf script` with sudo,
+        // so that we can resolve privileged kernel symbols from /proc/kallsyms.
         let perf = env::var("PERF").unwrap_or_else(|_| "perf".to_string());
-        let mut command = Command::new(perf);
+        let mut command = sudo_command(&perf, sudo);
 
         command.arg("script");
+
+        // Force reading perf.data owned by another uid if it happened to be created earlier.
+        command.arg("--force");
+
         if script_no_inline {
             command.arg("--no-inline");
         }
@@ -142,28 +141,49 @@ mod arch {
     #[cfg(target_os = "windows")]
     pub const BLONDIE_ERROR: &str = "could not find dtrace and could not profile using blondie";
 
+    #[cfg(target_os = "macos")]
+    fn base_dtrace_command(sudo: Option<Option<&str>>) -> Command {
+        // If DTrace is spawned from a parent process (or grandparent process etc.) running in Rosetta-emulated x86 mode
+        // on an ARM mac, it will fail to trace the child process with a confusing syntax error in its stdlib .d file.
+        // If the flamegraph binary, or the cargo binary, have been compiled as x86, this can cause all tracing to fail.
+        // To work around that, we unconditionally wrap dtrace on MacOS in the "arch -64/-32" wrapper so it's always
+        // running in the native architecture matching the bit width (32 oe 64) with which "flamegraph" was compiled.
+        // NOTE that dtrace-as-x86 won't trace a deliberately-cross-compiled x86 binary running under Rosetta regardless
+        // of "arch" wrapping; attempts to do that will fail with "DTrace cannot instrument translated processes".
+        // NOTE that using the ARCHPREFERENCE environment variable documented here
+        // (https://www.unix.com/man-page/osx/1/arch/) would be a much simpler solution to this issue, but it does not
+        // seem to have any effect on dtrace when set (via Command::env, shell export, or std::env in the spawning
+        // process).
+        let mut command = sudo_command("arch", sudo);
+
+        #[cfg(target_pointer_width = "64")]
+        command.arg("-64".to_string());
+        #[cfg(target_pointer_width = "32")]
+        command.arg("-32".to_string());
+
+        command.arg(env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string()));
+        command
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn base_dtrace_command(sudo: Option<Option<&str>>) -> Command {
+        let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
+        sudo_command(&dtrace, sudo)
+    }
+
     pub(crate) fn initial_command(
         workload: &Workload,
-        sudo: bool,
-        freq: Option<u32>,
+        sudo: Option<Option<&str>>,
+        freq: u32,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
     ) -> Option<String> {
-        let dtrace = env::var("DTRACE").unwrap_or_else(|_| "dtrace".to_string());
-
-        let mut command = if sudo {
-            let mut c = Command::new("sudo");
-            c.arg(&dtrace);
-            c
-        } else {
-            Command::new(&dtrace)
-        };
+        let mut command = base_dtrace_command(sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
-            "profile-{} /pid == $target/ \
+            "profile-{freq} /pid == $target/ \
              {{ @[ustack(100)] = count(); }}",
-            freq.unwrap_or(997)
         ));
 
         command.arg("-x");
@@ -190,7 +210,7 @@ mod arch {
 
                 #[cfg(target_os = "windows")]
                 {
-                    let mut help_test = Command::new(&dtrace);
+                    let mut help_test = crate::arch::base_dtrace_command(None);
 
                     let dtrace_found = help_test
                         .arg("--help")
@@ -233,7 +253,7 @@ mod arch {
     pub fn output(
         _: Option<String>,
         script_no_inline: bool,
-        sudo: bool,
+        sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
             return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
@@ -241,7 +261,7 @@ mod arch {
 
         // Ensure the file is readable by the current user if dtrace was run
         // with sudo.
-        if sudo {
+        if sudo.is_some() {
             #[cfg(unix)]
             if let Ok(user) = env::var("USER") {
                 Command::new("sudo")
@@ -282,6 +302,20 @@ mod arch {
     }
 }
 
+fn sudo_command(command: &str, sudo: Option<Option<&str>>) -> Command {
+    let sudo = match sudo {
+        Some(sudo) => sudo,
+        None => return Command::new(command),
+    };
+
+    let mut c = Command::new("sudo");
+    if let Some(sudo_args) = sudo {
+        c.arg(sudo_args);
+    }
+    c.arg(command);
+    c
+}
+
 fn run(mut command: Command, verbose: bool, ignore_status: bool) {
     print_command(&command, verbose);
     let mut recorder = command.spawn().expect(arch::SPAWN_ERROR);
@@ -316,7 +350,7 @@ fn print_command(cmd: &Command, verbose: bool) {
     }
 }
 
-pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options, iterations: usize) -> anyhow::Result<()> {
+pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
     // process under observation while we continue to
@@ -328,25 +362,60 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options, itera
         signal_hook::low_level::register(SIGINT, || {}).expect("cannot register signal handler")
     };
 
-    for _i in 0..iterations {
-        if let Workload::ReadPerf(_perf_file) = &workload {
-            // pass
-        } else {
-            arch::initial_command(
+    let sudo = opts.root.as_ref().map(|inner| inner.as_deref());
+
+    let perf_output = if let Workload::ReadPerf(perf_file) = workload {
+        Some(perf_file)
+    } else {
+        let mut output = String::new();
+        for _ in 0..opts.iterations.unwrap_or(1) {
+            if let Some(iter_output) = arch::initial_command(
                 &workload,
-                opts.root,
-                opts.frequency,
+                sudo,
+                opts.frequency(),
                 opts.custom_cmd.clone(),
                 opts.verbose,
                 opts.ignore_status,
-            );
-        };    
-    }
-    
+            ) {
+                output.push_str(&iter_output);
+            }
+        }
+        if output.is_empty() {
+            None
+        } else {
+            Some(output)
+        }
+        // Some(
+        //     (0..opts.iterations.unwrap_or(1)).fold(String::new(), |acc, _| {
+        //         if let Some(iter_output) = arch::initial_command(
+        //             &workload,
+        //             sudo,
+        //             opts.frequency(),
+        //             opts.custom_cmd,
+        //             opts.verbose,
+        //             opts.ignore_status,
+        //         ) {
+        //             acc.push_str(&iter_output);
+        //         }
+        //         acc
+        //     }),
+        // )
+        // for _ in 1..opts.iterations.unwrap_or(1) {
+        // arch::initial_command(
+        //     &workload,
+        //     sudo,
+        //     opts.frequency(),
+        //     opts.custom_cmd,
+        //     opts.verbose,
+        //     opts.ignore_status,
+        // )
+        // }
+    };
+
     #[cfg(unix)]
     signal_hook::low_level::unregister(handler);
 
-    let output = arch::output(None, opts.script_no_inline, opts.root)?;
+    let output = arch::output(perf_output, opts.script_no_inline, sudo)?;
 
     let perf_reader = BufReader::new(&*output);
 
@@ -371,8 +440,8 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options, itera
             .ok_or_else(|| anyhow!("unable to parse post-process command"))?;
 
         let mut child = Command::new(
-            &command_vec
-                .get(0)
+            command_vec
+                .first()
                 .ok_or_else(|| anyhow!("unable to parse post-process command"))?,
         )
         .args(command_vec.get(1..).unwrap_or(&[]))
@@ -449,13 +518,17 @@ pub struct Options {
     #[clap(long)]
     open: bool,
 
-    /// Run with root privileges (using `sudo`)
-    #[clap(long)]
-    root: bool,
+    /// Run with root privileges (using `sudo`). Accepts an optional argument containing command line options which will be passed to sudo
+    #[clap(long, value_name = "SUDO FLAGS")]
+    pub root: Option<Option<String>>,
 
-    /// Sampling frequency
+    /// Sampling frequency in Hz [default: 997]
     #[clap(short = 'F', long = "freq")]
     frequency: Option<u32>,
+
+    /// Number of runs for target binary. Defaults to 1.
+    #[clap(long)]
+    iterations: Option<usize>,
 
     /// Custom command for invoking perf/dtrace
     #[clap(short, long = "cmd")]
@@ -489,10 +562,22 @@ impl Options {
             false => Ok(()),
         }
     }
+
+    pub fn frequency(&self) -> u32 {
+        self.frequency.unwrap_or(997)
+    }
 }
 
 #[derive(Debug, Args)]
 pub struct FlamegraphOptions {
+    /// Set title text in SVG
+    #[clap(long, value_name = "STRING")]
+    pub title: Option<String>,
+
+    /// Set second level title text in SVG
+    #[clap(long, value_name = "STRING")]
+    pub subtitle: Option<String>,
+
     /// Colors are selected such that the color of a function does not change between runs
     #[clap(long)]
     pub deterministic: bool,
@@ -520,10 +605,7 @@ pub struct FlamegraphOptions {
     /// Color palette
     #[clap(
         long,
-        value_parser([
-            "hot", "mem", "io", "red", "green", "blue", "aqua", "yellow",
-            "purple", "orange", "wakeup", "java", "perl", "js", "rust"
-        ])
+        value_parser = PossibleValuesParser::new(Palette::VARIANTS).map(|s| Palette::from_str(&s).unwrap())
     )]
     pub palette: Option<Palette>,
 
@@ -540,6 +622,10 @@ pub struct FlamegraphOptions {
 impl FlamegraphOptions {
     pub fn into_inferno(self) -> inferno::flamegraph::Options<'static> {
         let mut options = inferno::flamegraph::Options::default();
+        if let Some(title) = self.title {
+            options.title = title;
+        }
+        options.subtitle = self.subtitle;
         options.deterministic = self.deterministic;
         if self.inverted {
             options.direction = inferno::flamegraph::Direction::Inverted;

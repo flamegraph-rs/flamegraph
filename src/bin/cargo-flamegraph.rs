@@ -1,10 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
-use cargo_metadata::{Artifact, Message, MetadataCommand, Package};
+use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package};
 use clap::{Args, Parser};
 
 use flamegraph::Workload;
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[clap(rename_all = "snake_case")]
+enum UnitTestTargetKind {
+    Bin,
+    Lib,
+}
 
 #[derive(Args, Debug)]
 struct Opt {
@@ -24,6 +31,10 @@ struct Opt {
     #[clap(short, long, group = "exec-args")]
     bin: Option<String>,
 
+    /// Build for the target triple
+    #[clap(long, group = "exec-args")]
+    target: Option<String>,
+
     /// Example to run
     #[clap(long, group = "exec-args")]
     example: Option<String>,
@@ -37,6 +48,17 @@ struct Opt {
     /// can be passed as trailing arguments after `--` as separator)
     #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
+
+    /// Kind of target (lib or bin) when running with <unit-test> which is may be
+    /// required when we have two targets with the same name.
+    #[clap(long)]
+    unit_test_kind: Option<UnitTestTargetKind>,
+
+    /// Crate target to unit benchmark, <bench> may be omitted if crate only has one target
+    /// (currently profiles the test harness and all tests in the binary; test selection
+    /// can be passed as trailing arguments after `--` as separator)
+    #[clap(long, group = "exec-args")]
+    unit_bench: Option<Option<String>>,
 
     /// Benchmark to run
     #[clap(long, group = "exec-args")]
@@ -78,23 +100,23 @@ enum Cli {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Vec<Artifact>> {
+fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
     // This will build benchmarks with the `bench` profile. This is needed
     // because the `--profile` argument for `cargo build` is unstable.
-    if !opt.dev && opt.bench.is_some() {
-        cmd.args(&["bench", "--no-run"]);
+    if !opt.dev && (opt.bench.is_some() || opt.unit_bench.is_some()) {
+        cmd.args(["bench", "--no-run"]);
     } else if opt.unit_test.is_some() {
-        cmd.args(&["test", "--no-run"]);
+        cmd.args(["test", "--no-run"]);
     } else {
         cmd.arg("build");
     }
 
     if let Some(profile) = &opt.profile {
         cmd.arg("--profile").arg(profile);
-    } else if !opt.dev && opt.bench.is_none() {
+    } else if !opt.dev && opt.bench.is_none() && opt.unit_bench.is_none() {
         // do not use `--release` when we are building for `bench`
         cmd.arg("--release");
     }
@@ -107,6 +129,11 @@ fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Ve
     if let Some(ref bin) = opt.bin {
         cmd.arg("--bin");
         cmd.arg(bin);
+    }
+
+    if let Some(ref target) = opt.target {
+        cmd.arg("--target");
+        cmd.arg(target);
     }
 
     if let Some(ref example) = opt.example {
@@ -125,9 +152,16 @@ fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Ve
     }
 
     if let Some(Some(ref unit_test)) = opt.unit_test {
-        match kind.into_iter().any(|k| k == "lib") {
+        match kind.iter().any(|k| k == "lib") {
             true => cmd.arg("--lib"),
-            false => cmd.args(&["--bin", unit_test]),
+            false => cmd.args(["--bin", unit_test]),
+        };
+    }
+
+    if let Some(Some(ref unit_bench)) = opt.unit_bench {
+        match kind.iter().any(|k| k == "lib") {
+            true => cmd.arg("--lib"),
+            false => cmd.args(["--bin", unit_bench]),
         };
     }
 
@@ -170,6 +204,8 @@ fn build(opt: &Opt, kind: impl IntoIterator<Item = String>) -> anyhow::Result<Ve
 }
 
 fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
+    let mut trailing_arguments = opt.trailing_arguments.clone();
+
     if artifacts.iter().all(|a| a.executable.is_none()) {
         return Err(anyhow!(
             "build artifacts do not contain any executable to profile"
@@ -187,6 +223,13 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             unit_test: Some(Some(t)),
             ..
         } => (&["lib", "bin"], t),
+        Opt {
+            unit_bench: Some(Some(t)),
+            ..
+        } => {
+            trailing_arguments.push("--bench".to_string());
+            (&["lib", "bin"], t)
+        }
         _ => return Err(anyhow!("no target for profiling")),
     };
 
@@ -200,7 +243,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
                     a.target.name == *target
                         && a.target.kind.iter().any(|k| kind.contains(&k.as_str()))
                 })
-                .map(|e| (a.profile.debuginfo, e))
+                .map(|e| (&a.profile.debuginfo, e))
         })
         .ok_or_else(|| {
             let targets: Vec<_> = artifacts
@@ -214,8 +257,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             )
         })?;
 
-    const NONE: u32 = 0;
-    if !opt.dev && debug_level.unwrap_or(NONE) == NONE {
+    if !opt.dev && debug_level == &ArtifactDebuginfo::None {
         let profile = match opt
             .example
             .as_ref()
@@ -235,9 +277,9 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         eprintln!("CARGO_PROFILE_{}_DEBUG=true\n", profile.to_uppercase());
     }
 
-    let mut command = Vec::with_capacity(1 + opt.trailing_arguments.len());
+    let mut command = Vec::with_capacity(1 + trailing_arguments.len());
     command.push(binary_path.to_string());
-    command.extend(opt.trailing_arguments.iter().cloned());
+    command.extend(trailing_arguments);
     Ok(command)
 }
 
@@ -383,7 +425,7 @@ fn find_unique_target(
                 or similar to choose a binary"
         )),
         _ => Err(anyhow!(
-            "several possible targets found: {:?}, please pass an explicit target.",
+            "several possible targets found: {:#?}, please pass an explicit target.",
             targets
         )),
     }
@@ -398,6 +440,7 @@ fn main() -> anyhow::Result<()> {
         && opt.example.is_none()
         && opt.test.is_none()
         && opt.unit_test.is_none()
+        && opt.unit_bench.is_none()
     {
         let target = find_unique_target(
             &["bin"],
@@ -409,8 +452,14 @@ fn main() -> anyhow::Result<()> {
         opt.package = Some(target.package);
         target.kind
     } else if let Some(unit_test) = opt.unit_test {
+        let kinds = match opt.unit_test_kind {
+            Some(UnitTestTargetKind::Bin) => &["bin"][..], // get slice to help type inference
+            Some(UnitTestTargetKind::Lib) => &["lib"],
+            None => &["bin", "lib"],
+        };
+
         let target = find_unique_target(
-            &["bin", "lib"],
+            kinds,
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_test.as_deref(),
@@ -418,9 +467,26 @@ fn main() -> anyhow::Result<()> {
         opt.unit_test = Some(Some(target.target));
         opt.package = Some(target.package);
         target.kind
+    } else if let Some(unit_bench) = opt.unit_bench {
+        let target = find_unique_target(
+            &["bin", "lib"],
+            opt.package.as_deref(),
+            opt.manifest_path.as_deref(),
+            unit_bench.as_deref(),
+        )?;
+        opt.unit_bench = Some(Some(target.target));
+        opt.package = Some(target.package);
+        target.kind
     } else {
         Vec::new()
     };
+
+    #[cfg(target_os = "macos")]
+    if let None = opt.graph.root {
+        return Err(anyhow!(
+            "DTrace requires elevated permissions on MacOS; re-invoke using 'cargo flamegraph --root ...'",
+        ));
+    }
 
     let artifacts = build(&opt, kind)?;
     let workload = workload(&opt, &artifacts)?;
