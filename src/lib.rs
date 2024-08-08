@@ -367,9 +367,8 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
-        let mut output = String::new();
-        for _ in 0..opts.iterations.unwrap_or(1) {
-            if let Some(iter_output) = arch::initial_command(
+        let out = (0..opts.iterations.unwrap_or(1)).fold(String::new(), |mut out, _i| {
+            if let Some(iter_out) = arch::initial_command(
                 &workload,
                 sudo,
                 opts.frequency(),
@@ -377,13 +376,14 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
                 opts.verbose,
                 opts.ignore_status,
             ) {
-                output.push_str(&iter_output);
+                out.push_str(&iter_out)
             }
-        }
-        if output.is_empty() {
+            out
+        });
+        if out.is_empty() {
             None
         } else {
-            Some(output)
+            Some(out)
         }
     };
 
