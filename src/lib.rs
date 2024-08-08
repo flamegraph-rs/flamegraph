@@ -385,31 +385,6 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
         } else {
             Some(output)
         }
-        // Some(
-        //     (0..opts.iterations.unwrap_or(1)).fold(String::new(), |acc, _| {
-        //         if let Some(iter_output) = arch::initial_command(
-        //             &workload,
-        //             sudo,
-        //             opts.frequency(),
-        //             opts.custom_cmd,
-        //             opts.verbose,
-        //             opts.ignore_status,
-        //         ) {
-        //             acc.push_str(&iter_output);
-        //         }
-        //         acc
-        //     }),
-        // )
-        // for _ in 1..opts.iterations.unwrap_or(1) {
-        // arch::initial_command(
-        //     &workload,
-        //     sudo,
-        //     opts.frequency(),
-        //     opts.custom_cmd,
-        //     opts.verbose,
-        //     opts.ignore_status,
-        // )
-        // }
     };
 
     #[cfg(unix)]
