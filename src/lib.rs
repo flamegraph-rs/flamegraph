@@ -200,9 +200,16 @@ mod arch {
         };
         let filter = if global { "" } else { "/pid == $target/" };
 
+        let timeout = if let Some(t) = opts.timeout {
+            format!("tick-{}ms {{ exit(0); }}", t.as_millis())
+        } else {
+            "".to_owned()
+        };
+
         let dtrace_script = custom_cmd.unwrap_or(format!(
             "profile-{freq} {filter}  \
-             {{ @[{stack}] = count(); }}",
+             {{ @[{stack}] = count(); }} \
+             {timeout}",
         ));
 
         command.arg("-x");
@@ -544,6 +551,10 @@ pub struct Options {
     /// Include kernel stack frames
     #[clap(long)]
     kernel: bool,
+
+    /// Amount of time to sample for
+    #[clap(long)]
+    timeout: Option<humantime::Duration>,
 }
 
 impl Options {
@@ -565,6 +576,8 @@ impl Options {
                 bail!("Global tracing is only supported using DTrace backend");
             } else if self.kernel {
                 bail!("Kernel tracing is only supported using DTrace backend");
+            } else if self.timeout.is_some() {
+                bail!("Timeout is only supported using DTrace backend");
             }
         }
 
