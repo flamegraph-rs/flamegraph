@@ -83,10 +83,6 @@ struct Opt {
     #[clap(flatten)]
     graph: flamegraph::Options,
 
-    /// Number of runs for target binary. Defaults to 1.
-    #[clap(long)]    
-    iterations: Option<usize>,
-
     /// Trailing arguments passed to the binary being profiled.
     #[clap(last = true)]
     trailing_arguments: Vec<String>,
@@ -490,5 +486,5 @@ fn main() -> anyhow::Result<()> {
 
     let artifacts = build(&opt, kind)?;
     let workload = workload(&opt, &artifacts)?;
-    flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph, opt.iterations.unwrap_or(1))
+    flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph)
 }
