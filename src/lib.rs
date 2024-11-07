@@ -26,9 +26,13 @@ use clap::{
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 
+/// Mode of operation.
 pub enum Workload {
+    /// Execute an executable with the given command and arguments.
     Command(Vec<String>),
+    /// Profile a running process with the given PID.
     Pid(u32),
+    /// Read profiling data from a file.
     ReadPerf(String),
 }
 
@@ -168,7 +172,7 @@ mod arch {
     }
 
     pub(crate) fn initial_command(
-        workload: Workload,
+        workload: &Workload,
         sudo: Option<Option<&str>>,
         freq: u32,
         custom_cmd: Option<String>,
@@ -363,14 +367,24 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
-        arch::initial_command(
-            workload,
-            sudo,
-            opts.frequency(),
-            opts.custom_cmd,
-            opts.verbose,
-            opts.ignore_status,
-        )
+        let out = (0..opts.iterations.unwrap_or(1)).fold(String::new(), |mut out, _i| {
+            if let Some(iter_out) = arch::initial_command(
+                &workload,
+                sudo,
+                opts.frequency(),
+                opts.custom_cmd.clone(),
+                opts.verbose,
+                opts.ignore_status,
+            ) {
+                out.push_str(&iter_out)
+            }
+            out
+        });
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
     };
 
     #[cfg(unix)]
@@ -486,6 +500,10 @@ pub struct Options {
     /// Sampling frequency in Hz [default: 997]
     #[clap(short = 'F', long = "freq")]
     frequency: Option<u32>,
+
+    /// Number of runs for target binary. Defaults to 1.
+    #[clap(long)]
+    iterations: Option<usize>,
 
     /// Custom command for invoking perf/dtrace
     #[clap(short, long = "cmd")]
