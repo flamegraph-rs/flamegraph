@@ -34,6 +34,9 @@ pub enum Workload {
 
 #[cfg(target_os = "linux")]
 mod arch {
+    use indicatif::{ProgressBar, ProgressStyle};
+    use std::time::Duration;
+
     use super::*;
 
     pub const SPAWN_ERROR: &str = "could not spawn perf";
@@ -116,7 +119,18 @@ mod arch {
             command.arg(perf_output);
         }
 
-        let output = command.output().context("unable to call perf script")?;
+        // perf script can take a long time to run. Notify the user that it is running
+        // by using a spinner. Note that if this function exits before calling
+        // spinner.finish(), then the spinner will be completely removed from the terminal.
+        let spinner = ProgressBar::new_spinner().with_prefix("Running perf script");
+        spinner.set_style(
+            ProgressStyle::with_template("{prefix} [{elapsed}]: {spinner:.green}").unwrap(),
+        );
+        spinner.enable_steady_tick(Duration::from_millis(500));
+
+        let result = command.output().context("unable to call perf script");
+        spinner.finish();
+        let output = result?;
         if !output.status.success() {
             anyhow::bail!(format!(
                 "unable to run 'perf script': ({}) {}",
