@@ -1,19 +1,46 @@
 # [cargo-]flamegraph
+<div align="center" style="text-align:center">
+  <a href="example.svg"><img src="example_cropped.png" alt="colorized flamegraph output" width="85%"></a>
 
-[![colorized flamegraph output](example_cropped.png)](example.svg)
+  <em>Generate flamegraphs for all applications, with additional support for Cargo projects. No perl or pipes required <3 </em>
+</div>
 
-A Rust-powered flamegraph generator with additional support for
-Cargo projects! It can be used to profile anything,
-not just Rust projects! No perl or pipes required <3
-
-How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
+Built using Rust, on top of [@jonhoo's](https://github.com/jonhoo) wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust flamegraph generation library!
 
 > [!TIP]
 > You might want to also try [samply](https://github.com/mstange/samply), which provides a more interactive UI
 > using a seamless integration with Firefox's Profiler web UI. It is also written in Rust and has better macOS support.
 
-Relies on perf on linux, dtrace on MacOS and natively supports Windows. Built on top of [@jonhoo's](https://github.com/jonhoo)
-wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust flamegraph generation library!
+## Quick Start
+
+Install it, and run
+```bash
+# Rust projects
+cargo flamegraph
+
+# Arbitrary binaries
+flamegraph -- /path/to/binary
+```
+
+How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
+
+## Installation
+
+\[cargo-\]flamegraph supports 
+- [Linux](#linux): Relies on `perf`
+- [MacOS](#macos): Relies on `dtrace`
+- [Windows](#windows): Native support with the [blondie](https://github.com/nico-abram/blondie) library. Also works with `dtrace` on Windows.
+
+```
+cargo install flamegraph
+```
+
+This will make the `flamegraph` and
+`cargo-flamegraph` binaries available in your cargo
+binary directory. On most systems this is
+usually something like `~/.cargo/bin`.
+
+## Linux
 
 **Note**: If you're using lld or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example, for lld:
 
@@ -30,19 +57,6 @@ and for mold:
 linker = "clang"
 rustflags = ["-Clink-arg=-fuse-ld=/usr/local/bin/mold", "-Clink-arg=-Wl,--no-rosegment"]
 ```
-
-## Installation
-
-```
-cargo install flamegraph
-```
-
-This will make the `flamegraph` and
-`cargo-flamegraph` binaries available in your cargo
-binary directory. On most systems this is
-usually something like `~/.cargo/bin`.
-
-Requirements on Linux:
 
 #### Debian (x86 and aarch)
 **Note**: Debian bullseye (the current stable version as of 2022) packages an outdated version of Rust which does not meet flamegraph's requirements. You should use [rustup](https://rustup.rs/) to install an up-to-date version of Rust, or upgrade to Debian bookworm (the current testing version) or newer.
@@ -66,6 +80,30 @@ sudo apt install linux-tools-raspi
 ```bash
 sudo apt install linux-tools-common linux-tools-generic
 ```
+## MacOS
+
+#### DTrace on macOS
+
+On macOS, there is no alternative to running as superuser in order to
+enable DTrace. This should be done by invoking `sudo flamegraph ...` or
+`cargo flamegraph --root ...`. Do not do `sudo cargo flamegraph ...`;
+this can cause problems due to Cargo's build system being run as root.
+
+Be aware that if the binary being tested is user-aware, this does
+change its behaviour.
+
+## Windows
+
+#### Blondie Backend
+
+This is enabled by default.
+Windows is supported out-of-the-box, thanks to [Nicolas Abram](https://github.com/nico-abram)'s excellent [blondie](https://github.com/nico-abram/blondie) library. 
+
+#### DTrace on Windows
+
+Alternatively, one can [install DTrace on Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/dtrace). If found, flamegraph will always prefer using `dtrace` over the built-in Windows support.
+If you try this out please let us know how it goes. :D
+
 
 ## Shell auto-completion
 
@@ -186,21 +224,6 @@ be acceptable for your security needs etc...
 ```bash
 echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 ```
-
-### DTrace on macOS
-
-On macOS, there is no alternative to running as superuser in order to
-enable DTrace. This should be done by invoking `sudo flamegraph ...` or
-`cargo flamegraph --root ...`. Do not do `sudo cargo flamegraph ...`;
-this can cause problems due to Cargo's build system being run as root.
-
-Be aware that if the binary being tested is user-aware, this does
-change its behaviour.
-
-### DTrace on Windows
-
-DTrace can be [installed on Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/dtrace),
-so if you try this out please let us know how it goes. :D
 
 ## Improving output when running with `--release`
 
