@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
-use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package};
+use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package, TargetKind};
 use clap::{Args, Parser};
 
 use flamegraph::Workload;
@@ -96,7 +96,7 @@ enum Cli {
     Flamegraph(Opt),
 }
 
-fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
+fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
     use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
@@ -148,14 +148,14 @@ fn build(opt: &Opt, kind: Vec<String>) -> anyhow::Result<Vec<Artifact>> {
     }
 
     if let Some(Some(ref unit_test)) = opt.unit_test {
-        match kind.iter().any(|k| k == "lib") {
+        match kind.iter().any(|k| k == &TargetKind::Lib) {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_test]),
         };
     }
 
     if let Some(Some(ref unit_bench)) = opt.unit_bench {
-        match kind.iter().any(|k| k == "lib") {
+        match kind.iter().any(|k| k == &TargetKind::Lib) {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_bench]),
         };
@@ -208,23 +208,23 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         ));
     }
 
-    let (kind, target): (&[&str], _) = match opt {
-        Opt { bin: Some(t), .. } => (&["bin"], t),
+    let (kind, target): (&[TargetKind], _) = match opt {
+        Opt { bin: Some(t), .. } => (&[TargetKind::Bin], t),
         Opt {
             example: Some(t), ..
-        } => (&["example"], t),
-        Opt { test: Some(t), .. } => (&["test"], t),
-        Opt { bench: Some(t), .. } => (&["bench"], t),
+        } => (&[TargetKind::Example], t),
+        Opt { test: Some(t), .. } => (&[TargetKind::Test], t),
+        Opt { bench: Some(t), .. } => (&[TargetKind::Bench], t),
         Opt {
             unit_test: Some(Some(t)),
             ..
-        } => (&["lib", "bin"], t),
+        } => (&[TargetKind::Lib, TargetKind::Bin], t),
         Opt {
             unit_bench: Some(Some(t)),
             ..
         } => {
             trailing_arguments.push("--bench".to_string());
-            (&["lib", "bin"], t)
+            (&[TargetKind::Lib, TargetKind::Bin], t)
         }
         _ => return Err(anyhow!("no target for profiling")),
     };
@@ -236,8 +236,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             a.executable
                 .as_deref()
                 .filter(|_| {
-                    a.target.name == *target
-                        && a.target.kind.iter().any(|k| kind.contains(&k.as_str()))
+                    a.target.name == *target && a.target.kind.iter().any(|k| kind.contains(&k))
                 })
                 .map(|e| (&a.profile.debuginfo, e))
         })
@@ -283,7 +282,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
 struct BinaryTarget {
     package: String,
     target: String,
-    kind: Vec<String>,
+    kind: Vec<TargetKind>,
 }
 
 impl std::fmt::Display for BinaryTarget {
@@ -329,7 +328,7 @@ pub fn find_crate_root(manifest_path: Option<&Path>) -> anyhow::Result<PathBuf> 
 }
 
 fn find_unique_target(
-    kind: &[&str],
+    kind: &[TargetKind],
     pkg: Option<&str>,
     manifest_path: Option<&Path>,
     target_name: Option<&str>,
@@ -380,7 +379,7 @@ fn find_unique_target(
             }
             targets.into_iter().filter_map(move |t| {
                 // Keep only targets that are of the right kind.
-                if !t.kind.iter().any(|s| kind.contains(&s.as_str())) {
+                if !t.kind.iter().any(|s| kind.contains(&s)) {
                     return None;
                 }
 
@@ -439,7 +438,7 @@ fn main() -> anyhow::Result<()> {
         && opt.unit_bench.is_none()
     {
         let target = find_unique_target(
-            &["bin"],
+            &[TargetKind::Bin],
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             None,
@@ -449,9 +448,9 @@ fn main() -> anyhow::Result<()> {
         target.kind
     } else if let Some(unit_test) = opt.unit_test {
         let kinds = match opt.unit_test_kind {
-            Some(UnitTestTargetKind::Bin) => &["bin"][..], // get slice to help type inference
-            Some(UnitTestTargetKind::Lib) => &["lib"],
-            None => &["bin", "lib"],
+            Some(UnitTestTargetKind::Bin) => &[TargetKind::Bin][..], // get slice to help type inference
+            Some(UnitTestTargetKind::Lib) => &[TargetKind::Lib],
+            None => &[TargetKind::Bin, TargetKind::Lib],
         };
 
         let target = find_unique_target(
@@ -465,7 +464,7 @@ fn main() -> anyhow::Result<()> {
         target.kind
     } else if let Some(unit_bench) = opt.unit_bench {
         let target = find_unique_target(
-            &["bin", "lib"],
+            &[TargetKind::Bin, TargetKind::Lib],
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_bench.as_deref(),
