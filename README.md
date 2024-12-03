@@ -241,7 +241,11 @@ env PERF=~/bin/perf flamegraph /path/to/my/binary
 
 ## Use custom `addr2line` binary for perf
 
-It has been reported that `addr2line` can run very slowly in several issues (#74, #199, #294). One solution is to use [gimli-rs/addr2line](https://github.com/gimli-rs/addr2line) instead of the system `addr2line` binary. This is suggested in [this comment](https://github.com/flamegraph-rs/flamegraph/issues/74#issuecomment-1909417039), and you can follow the steps below to set it up:
+It has been reported that `addr2line` can run very slowly in several issues ([#74][i74], [#199][i199], [#294][i294]). One solution is to use [gimli-rs/addr2line](https://github.com/gimli-rs/addr2line) instead of the system `addr2line` binary. This is suggested in [this comment](https://github.com/flamegraph-rs/flamegraph/issues/74#issuecomment-1909417039), and you can follow the steps below to set it up:
+
+[i74]: https://github.com/flamegraph-rs/flamegraph/issues/74
+[i199]: https://github.com/flamegraph-rs/flamegraph/issues/199
+[i294]: https://github.com/flamegraph-rs/flamegraph/issues/294
 
 1. Clone the `addr2line` repository:
 
@@ -282,6 +286,10 @@ cargo() {
 ```
 
 Replace `/path/to/addr2line` with the actual path where you cloned `gimli-rs/addr2line`. This will ensure that `flamegraph` and `cargo flamegraph` always use the custom `addr2line` binary.
+
+[i74]: https://github.com/flamegraph-rs/flamegraph/issues/74
+[i199]: https://github.com/flamegraph-rs/flamegraph/issues/199
+[i294]: https://github.com/flamegraph-rs/flamegraph/issues/294
 
 # Systems Performance Work Guided By Flamegraphs
 
