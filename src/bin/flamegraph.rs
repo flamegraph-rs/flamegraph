@@ -20,6 +20,7 @@ struct Opt {
     #[clap(flatten)]
     graph: flamegraph::Options,
 
+    /// Read perf data from the given file.
     #[clap(long = "perfdata", conflicts_with = "pid")]
     perf_file: Option<PathBuf>,
 
