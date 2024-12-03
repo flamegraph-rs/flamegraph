@@ -277,7 +277,7 @@ ADDR2LINE_HOME=/path/to/addr2line
 alias flamegraph="PATH=$ADDR2LINE_HOME/target/release:$PATH flamegraph"
 
 cargo() {
-  if ["$1" = "flamegraph"]; then
+  if [ "$1" = "flamegraph" ]; then
     PATH=$ADDR2LINE_HOME/target/release:$PATH cargo "$@"
   else
     cargo "$@"
