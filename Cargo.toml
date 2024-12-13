@@ -30,6 +30,7 @@ shlex = "1.1.0"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"
+tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 blondie = "0.5.2"

@@ -32,6 +32,34 @@ pub enum Workload {
     ReadPerf(String),
 }
 
+pub enum PerfDataFile {
+    Tempfile(tempfile::NamedTempFile),
+    Path(PathBuf),
+}
+
+impl PerfDataFile {
+    pub fn as_str(&self) -> &str {
+        match self {
+            PerfDataFile::Tempfile(f) => {
+                f.path().to_str().expect("temp file was is not a valid str")
+            }
+            PerfDataFile::Path(p) => p.to_str().expect("perf data file is not a valid str"),
+        }
+    }
+}
+
+impl From<String> for PerfDataFile {
+    fn from(s: String) -> Self {
+        PerfDataFile::Path(PathBuf::from(s))
+    }
+}
+
+impl From<tempfile::NamedTempFile> for PerfDataFile {
+    fn from(f: tempfile::NamedTempFile) -> Self {
+        PerfDataFile::Tempfile(f)
+    }
+}
+
 #[cfg(target_os = "linux")]
 mod arch {
     use indicatif::{ProgressBar, ProgressStyle};
@@ -49,7 +77,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<String> {
+    ) -> Option<PerfDataFile> {
         let perf = if let Ok(path) = env::var("PERF") {
             path
         } else {
@@ -76,8 +104,19 @@ mod arch {
             if arg == "-o" {
                 let next_arg = args.next().expect("missing '-o' argument");
                 command.arg(next_arg);
-                perf_output = Some(next_arg.to_string());
+                perf_output = Some(next_arg.to_string().into());
             }
+        }
+
+        if perf_output.is_none() {
+            let perf_data = tempfile::Builder::new()
+                .prefix("perf")
+                .suffix(".data")
+                .tempfile()
+                .expect("unable to create temporary file for the perf data output");
+            command.arg("-o");
+            command.arg(perf_data.path());
+            perf_output = Some(perf_data.into());
         }
 
         match workload {
@@ -96,7 +135,7 @@ mod arch {
     }
 
     pub fn output(
-        perf_output: Option<String>,
+        perf_output: Option<PerfDataFile>,
         script_no_inline: bool,
         sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
@@ -116,7 +155,7 @@ mod arch {
 
         if let Some(perf_output) = perf_output {
             command.arg("-i");
-            command.arg(perf_output);
+            command.arg(perf_output.as_str());
         }
 
         // perf script can take a long time to run. Notify the user that it is running
@@ -188,7 +227,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<String> {
+    ) -> Option<PerfDataFile> {
         let mut command = base_dtrace_command(sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
@@ -261,7 +300,7 @@ mod arch {
     }
 
     pub fn output(
-        _: Option<String>,
+        _: Option<PerfDataFile>,
         script_no_inline: bool,
         sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
@@ -375,7 +414,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let sudo = opts.root.as_ref().map(|inner| inner.as_deref());
 
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
-        Some(perf_file)
+        Some(perf_file.into())
     } else {
         arch::initial_command(
             workload,
