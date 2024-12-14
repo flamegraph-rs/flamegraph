@@ -33,16 +33,12 @@ pub enum Workload {
 }
 
 pub enum PerfDataFile {
-    Tempfile(tempfile::NamedTempFile),
     Path(PathBuf),
 }
 
 impl PerfDataFile {
     pub fn as_str(&self) -> &str {
         match self {
-            PerfDataFile::Tempfile(f) => {
-                f.path().to_str().expect("temp file was is not a valid str")
-            }
             PerfDataFile::Path(p) => p.to_str().expect("perf data file is not a valid str"),
         }
     }
@@ -51,12 +47,6 @@ impl PerfDataFile {
 impl From<String> for PerfDataFile {
     fn from(s: String) -> Self {
         PerfDataFile::Path(PathBuf::from(s))
-    }
-}
-
-impl From<tempfile::NamedTempFile> for PerfDataFile {
-    fn from(f: tempfile::NamedTempFile) -> Self {
-        PerfDataFile::Tempfile(f)
     }
 }
 
@@ -109,14 +99,9 @@ mod arch {
         }
 
         if perf_output.is_none() {
-            let perf_data = tempfile::Builder::new()
-                .prefix("perf")
-                .suffix(".data")
-                .tempfile()
-                .expect("unable to create temporary file for the perf data output");
             command.arg("-o");
-            command.arg(perf_data.path());
-            perf_output = Some(perf_data.into());
+            command.arg("perf.data");
+            perf_output = Some("perf.data".to_string().into());
         }
 
         match workload {
@@ -154,9 +139,15 @@ mod arch {
         }
 
         if let Some(perf_output) = perf_output {
+            assert!({
+                let metadata = std::fs::metadata(perf_output.as_str()).unwrap();
+                metadata.is_file()
+            });
             command.arg("-i");
             command.arg(perf_output.as_str());
         }
+        // provide more context for the error message
+        command.stderr(Stdio::inherit());
 
         // perf script can take a long time to run. Notify the user that it is running
         // by using a spinner. Note that if this function exits before calling
