@@ -146,8 +146,6 @@ mod arch {
             command.arg("-i");
             command.arg(perf_output.as_str());
         }
-        // provide more context for the error message
-        command.stderr(Stdio::inherit());
 
         // perf script can take a long time to run. Notify the user that it is running
         // by using a spinner. Note that if this function exits before calling
