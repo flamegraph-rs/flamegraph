@@ -80,6 +80,15 @@ mod arch {
             }
         }
 
+        let perf_output = match perf_output {
+            Some(path) => path,
+            None => {
+                command.arg("-o");
+                command.arg("perf.data");
+                PathBuf::from("perf.data")
+            }
+        };
+
         match workload {
             Workload::Command(c) => {
                 command.args(&c);
@@ -92,7 +101,7 @@ mod arch {
         }
 
         run(command, verbose, ignore_status);
-        perf_output
+        Some(perf_output)
     }
 
     pub fn output(
