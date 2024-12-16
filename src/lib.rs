@@ -29,7 +29,7 @@ use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_r
 pub enum Workload {
     Command(Vec<String>),
     Pid(u32),
-    ReadPerf(String),
+    ReadPerf(PathBuf),
 }
 
 #[cfg(target_os = "linux")]
@@ -49,7 +49,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<String> {
+    ) -> Option<PathBuf> {
         let perf = if let Ok(path) = env::var("PERF") {
             path
         } else {
@@ -76,7 +76,7 @@ mod arch {
             if arg == "-o" {
                 let next_arg = args.next().expect("missing '-o' argument");
                 command.arg(next_arg);
-                perf_output = Some(next_arg.to_string());
+                perf_output = Some(PathBuf::from(next_arg));
             }
         }
 
@@ -96,7 +96,7 @@ mod arch {
     }
 
     pub fn output(
-        perf_output: Option<String>,
+        perf_output: Option<PathBuf>,
         script_no_inline: bool,
         sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
@@ -188,7 +188,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<String> {
+    ) -> Option<PathBuf> {
         let mut command = base_dtrace_command(sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
@@ -261,7 +261,7 @@ mod arch {
     }
 
     pub fn output(
-        _: Option<String>,
+        _: Option<PathBuf>,
         script_no_inline: bool,
         sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
