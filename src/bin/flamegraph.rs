@@ -43,8 +43,7 @@ fn main() -> anyhow::Result<()> {
     opt.graph.check()?;
 
     let workload = if let Some(perf_file) = opt.perf_file {
-        let path = perf_file.to_str().unwrap();
-        Workload::ReadPerf(path.to_string())
+        Workload::ReadPerf(perf_file)
     } else {
         match (opt.pid, opt.trailing_arguments.is_empty()) {
             (Some(p), true) => Workload::Pid(p),
