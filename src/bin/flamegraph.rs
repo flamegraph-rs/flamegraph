@@ -9,9 +9,9 @@ use flamegraph::Workload;
 #[derive(Debug, Parser)]
 #[clap(version)]
 struct Opt {
-    /// Profile a running process by pid
-    #[clap(short, long)]
-    pid: Option<u32>,
+    /// Profile a running process by pid (comma separated list)
+    #[clap(short, long, value_delimiter(','))]
+    pid: Vec<u32>,
 
     /// Generate shell completions for the given shell.
     #[clap(long, value_name = "SHELL", exclusive(true))]
@@ -45,11 +45,11 @@ fn main() -> anyhow::Result<()> {
     let workload = if let Some(perf_file) = opt.perf_file {
         Workload::ReadPerf(perf_file)
     } else {
-        match (opt.pid, opt.trailing_arguments.is_empty()) {
-            (Some(p), true) => Workload::Pid(p),
-            (None, false) => Workload::Command(opt.trailing_arguments.clone()),
-            (Some(_), false) => return Err(anyhow!("cannot pass in command with --pid")),
-            (None, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+        match (opt.pid.is_empty(), opt.trailing_arguments.is_empty()) {
+            (false, true) => Workload::Pid(opt.pid),
+            (true, false) => Workload::Command(opt.trailing_arguments.clone()),
+            (false, false) => return Err(anyhow!("cannot pass in command with --pid")),
+            (true, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
         }
     };
     flamegraph::generate_flamegraph_for_workload(workload, opt.graph)
