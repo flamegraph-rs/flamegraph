@@ -1,5 +1,6 @@
 use std::{
     env,
+    fmt::Write as _,
     fs::File,
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
@@ -28,7 +29,7 @@ use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_r
 
 pub enum Workload {
     Command(Vec<String>),
-    Pid(u32),
+    Pid(Vec<u32>),
     ReadPerf(PathBuf),
 }
 
@@ -100,8 +101,16 @@ mod arch {
                 command.args(&c);
             }
             Workload::Pid(p) => {
-                command.arg("-p");
-                command.arg(p.to_string());
+                if let Some((first, pids)) = p.split_first() {
+                    let mut arg = first.to_string();
+
+                    for pid in pids {
+                        write!(arg, ",{pid}").unwrap();
+                    }
+
+                    command.arg("-p");
+                    command.arg(arg);
+                }
             }
             Workload::ReadPerf(_) => (),
         }
@@ -265,8 +274,10 @@ mod arch {
                 }
             }
             Workload::Pid(p) => {
-                command.arg("-p");
-                command.arg(p.to_string());
+                for p in p {
+                    command.arg("-p");
+                    command.arg(p.to_string());
+                }
             }
             Workload::ReadPerf(_) => (),
         }
