@@ -28,7 +28,7 @@ use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_r
 
 pub enum Workload {
     Command(Vec<String>),
-    Pid(u32),
+    Pid(Vec<u32>),
     ReadPerf(PathBuf),
 }
 
@@ -100,8 +100,10 @@ mod arch {
                 command.args(&c);
             }
             Workload::Pid(p) => {
+                let p = p.into_iter().map(|p| p.to_string()).collect::<Vec<_>>();
+
                 command.arg("-p");
-                command.arg(p.to_string());
+                command.arg(p.join(","));
             }
             Workload::ReadPerf(_) => (),
         }
@@ -265,8 +267,10 @@ mod arch {
                 }
             }
             Workload::Pid(p) => {
-                command.arg("-p");
-                command.arg(p.to_string());
+                for p in p {
+                    command.arg("-p");
+                    command.arg(p.to_string());
+                }
             }
             Workload::ReadPerf(_) => (),
         }
