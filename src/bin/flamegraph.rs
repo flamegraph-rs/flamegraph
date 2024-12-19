@@ -9,9 +9,9 @@ use flamegraph::Workload;
 #[derive(Debug, Parser)]
 #[clap(version)]
 struct Opt {
-    /// Profile a running process by pid
-    #[clap(short, long)]
-    pid: Option<u32>,
+    /// Profile a running process by pid (comma separated list)
+    #[clap(short, long, value_delimiter(','))]
+    pid: Option<Vec<u32>>,
 
     /// Generate shell completions for the given shell.
     #[clap(long, value_name = "SHELL", exclusive(true))]
