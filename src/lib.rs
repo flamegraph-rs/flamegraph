@@ -1,6 +1,5 @@
 use std::{
     env,
-    fmt::Write as _,
     fs::File,
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
@@ -35,8 +34,10 @@ pub enum Workload {
 
 #[cfg(target_os = "linux")]
 mod arch {
-    use indicatif::{ProgressBar, ProgressStyle};
+    use std::fmt::Write;
     use std::time::Duration;
+
+    use indicatif::{ProgressBar, ProgressStyle};
 
     use super::*;
 
