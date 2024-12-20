@@ -505,7 +505,7 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "flamegraph"
-version = "0.6.6"
+version = "0.6.7"
 dependencies = [
  "anyhow",
  "blondie",
