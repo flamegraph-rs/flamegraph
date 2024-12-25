@@ -6,6 +6,7 @@ A Rust-powered flamegraph generator with additional support for
 Cargo projects! It can be used to profile anything,
 not just Rust projects! No perl or pipes required <3
 
+Built on top of [@jonhoo's](https://github.com/jonhoo) wonderful [Inferno](https://github.com/jonhoo/inferno) all-rust flamegraph generation library!
 
 > [!TIP]
 > You might want to also try [samply](https://github.com/mstange/samply), which provides a more interactive UI
