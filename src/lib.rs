@@ -70,7 +70,7 @@ mod arch {
         };
         let mut command = sudo_command(&perf, sudo);
 
-        let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,16384 -g"));
+        let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,64000 -g"));
 
         let mut perf_output = None;
         let mut args = args.split_whitespace();
