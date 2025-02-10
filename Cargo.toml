@@ -27,6 +27,7 @@ indicatif = "0.17.8"
 inferno = { version = "0.12", default-features = false, features = ["multithreaded", "nameattr"] }
 opener = "0.7.1"
 shlex = "1.1.0"
+rustc-demangle = { version = "0.1", features = ["std"] }
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.10"

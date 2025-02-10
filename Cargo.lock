@@ -515,6 +515,7 @@ dependencies = [
  "indicatif",
  "inferno",
  "opener",
+ "rustc-demangle",
  "shlex",
  "signal-hook",
 ]
