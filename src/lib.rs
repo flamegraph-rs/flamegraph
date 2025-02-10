@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::File,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter, Cursor, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
     str::FromStr,
@@ -25,6 +25,7 @@ use clap::{
     Args,
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
+use rustc_demangle::demangle_stream;
 
 pub enum Workload {
     Command(Vec<String>),
@@ -419,7 +420,12 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let output = arch::output(perf_output, opts.script_no_inline, sudo)?;
 
-    let perf_reader = BufReader::new(&*output);
+    let mut demangled_output = vec![];
+
+    demangle_stream(&mut Cursor::new(output), &mut demangled_output, false)
+        .context("unable to demangle")?;
+
+    let perf_reader = BufReader::new(&*demangled_output);
 
     let mut collapsed = vec![];
 
