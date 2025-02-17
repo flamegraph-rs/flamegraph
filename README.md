@@ -247,49 +247,9 @@ It has been reported that `addr2line` can run very slowly in several issues ([#7
 [i199]: https://github.com/flamegraph-rs/flamegraph/issues/199
 [i294]: https://github.com/flamegraph-rs/flamegraph/issues/294
 
-1. Clone the `addr2line` repository:
-
-   ```bash
-   git clone https://github.com/gimli-rs/addr2line
-   cd addr2line
-   ```
-
-2. Build the `addr2line` binary with the `bin` feature enabled:
-
-   ```bash
-   cargo build --release --bin addr2line --features bin
-   ```
-
-3. Add the binary to your `PATH` for the current session:
-
-   ```bash
-   export PATH="$PWD/target/release:$PATH"
-   ```
-
-   Note: This `export` is not persistent across shell sessions. You can either run it again as needed or set up a shell alias for convenience.
-
-### Persistent Setup with Shell Alias
-
-To avoid having to run the `export` command each time, you can set up a shell alias by adding the following to your shell configuration file (e.g., `.bashrc` or `.zshrc`):
-
 ```bash
-ADDR2LINE_HOME=/path/to/addr2line
-alias flamegraph="PATH=$ADDR2LINE_HOME/target/release:$PATH flamegraph"
-
-cargo() {
-  if [ "$1" = "flamegraph" ]; then
-    PATH=$ADDR2LINE_HOME/target/release:$PATH cargo "$@"
-  else
-    cargo "$@"
-  fi
-}
+cargo install addr2line --features=bin
 ```
-
-Replace `/path/to/addr2line` with the actual path where you cloned `gimli-rs/addr2line`. This will ensure that `flamegraph` and `cargo flamegraph` always use the custom `addr2line` binary.
-
-[i74]: https://github.com/flamegraph-rs/flamegraph/issues/74
-[i199]: https://github.com/flamegraph-rs/flamegraph/issues/199
-[i294]: https://github.com/flamegraph-rs/flamegraph/issues/294
 
 # Systems Performance Work Guided By Flamegraphs
 
