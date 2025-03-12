@@ -303,7 +303,7 @@ pub fn find_crate_root(manifest_path: Option<&Path>) -> anyhow::Result<PathBuf> 
 
             path.canonicalize().with_context(|| {
                 anyhow!(
-                    "failed to canonicalize manifest parent directory '{}'\nHint: make sure your manifest path is exists and points to a Cargo.toml file",
+                    "failed to canonicalize manifest parent directory '{}'\nHint: make sure your manifest path exists and points to a Cargo.toml file",
                     path.display()
                 )
             })
