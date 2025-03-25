@@ -19,7 +19,7 @@ use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::{
     builder::{PossibleValuesParser, TypedValueParser},
     Args,
@@ -35,7 +35,6 @@ pub enum Workload {
 
 #[cfg(target_os = "linux")]
 mod arch {
-    use std::fmt::Write;
     use std::time::Duration;
 
     use indicatif::{ProgressBar, ProgressStyle};
@@ -52,7 +51,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<PathBuf> {
+    ) -> anyhow::Result<Option<PathBuf>> {
         let perf = if let Ok(path) = env::var("PERF") {
             path
         } else {
@@ -63,8 +62,7 @@ mod arch {
                 .status()
                 .is_err()
             {
-                eprintln!("perf is not installed or not present in $PATH");
-                exit(1);
+                bail!("perf is not installed or not present in $PATH");
             }
 
             String::from("perf")
@@ -83,7 +81,7 @@ mod arch {
             // order to correctly compute perf's output in
             // `Self::output`.
             if arg == "-o" {
-                let next_arg = args.next().expect("missing '-o' argument");
+                let next_arg = args.next().context("missing '-o' argument")?;
                 command.arg(next_arg);
                 perf_output = Some(PathBuf::from(next_arg));
             }
@@ -107,7 +105,8 @@ mod arch {
                     let mut arg = first.to_string();
 
                     for pid in pids {
-                        write!(arg, ",{pid}").unwrap();
+                        arg.push(',');
+                        arg.push_str(&pid.to_string());
                     }
 
                     command.arg("-p");
@@ -118,7 +117,7 @@ mod arch {
         }
 
         run(command, verbose, ignore_status);
-        Some(perf_output)
+        Ok(Some(perf_output))
     }
 
     pub fn output(
@@ -158,11 +157,11 @@ mod arch {
         spinner.finish();
         let output = result?;
         if !output.status.success() {
-            anyhow::bail!(format!(
+            bail!(
                 "unable to run 'perf script': ({}) {}",
                 output.status,
                 std::str::from_utf8(&output.stderr)?
-            ));
+            );
         }
         Ok(output.stdout)
     }
@@ -174,8 +173,6 @@ mod arch {
 
     pub const SPAWN_ERROR: &str = "could not spawn dtrace";
     pub const WAIT_ERROR: &str = "unable to wait for dtrace child command to exit";
-    #[cfg(target_os = "windows")]
-    pub const BLONDIE_ERROR: &str = "could not find dtrace and could not profile using blondie";
 
     #[cfg(target_os = "macos")]
     fn base_dtrace_command(sudo: Option<Option<&str>>) -> Command {
@@ -214,7 +211,7 @@ mod arch {
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<PathBuf> {
+    ) -> anyhow::Result<Option<PathBuf>> {
         let mut command = base_dtrace_command(sudo);
 
         let dtrace_script = custom_cmd.unwrap_or(format!(
@@ -259,19 +256,17 @@ mod arch {
                         command_builder.args(&c[1..]);
                         print_command(&command_builder, verbose);
 
-                        let trace = match blondie::trace_command(command_builder, false) {
-                            Err(err) => {
-                                eprintln!("{}: {:?}", BLONDIE_ERROR, err);
-                                exit(1);
-                            }
-                            Ok(trace) => trace,
-                        };
+                        let trace = blondie::trace_command(command_builder, false)
+                            .map_err(|err| anyhow!("could not find dtrace and could not profile using blondie: {err:?}"))?;
 
-                        let f = std::fs::File::create("./cargo-flamegraph.stacks").unwrap();
+                        let f = std::fs::File::create("./cargo-flamegraph.stacks")
+                            .context("unable to create temporary file 'cargo-flamegraph.stacks'")?;
                         let mut f = std::io::BufWriter::new(f);
-                        trace.write_dtrace(&mut f).unwrap();
+                        trace.write_dtrace(&mut f).map_err(|err| {
+                            anyhow!("unable to write dtrace output to 'cargo-flamegraph.stacks': {err:?}")
+                        })?;
 
-                        return None;
+                        return Ok(None);
                     }
                 }
             }
@@ -285,7 +280,7 @@ mod arch {
         }
 
         run(command, verbose, ignore_status);
-        None
+        Ok(None)
     }
 
     pub fn output(
@@ -294,7 +289,7 @@ mod arch {
         sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
-            return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
+            bail!("--no-inline is only supported on Linux");
         }
 
         // Ensure the file is readable by the current user if dtrace was run
@@ -412,7 +407,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
             opts.custom_cmd,
             opts.verbose,
             opts.ignore_status,
-        )
+        )?
     };
 
     #[cfg(unix)]
