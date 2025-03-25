@@ -180,11 +180,17 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        _freq: u32,
-        _custom_cmd: Option<String>,
+        freq: u32,
+        custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
-    ) -> Option<PathBuf> {
+    ) -> anyhow::Result<Option<PathBuf>> {
+        if freq != 997 {
+            bail!("xctrace doesn't support custom frequency");
+        }
+        if custom_cmd.is_some() {
+            bail!("xctrace doesn't support custom command");
+        }
         let xctrace = env::var("XCTRACE").unwrap_or_else(|_| "xctrace".to_string());
         let trace_file = PathBuf::from("cargo-flamegraph.trace");
         let mut command = sudo_command(&xctrace, sudo);
@@ -208,14 +214,14 @@ mod arch {
                         command.arg("--attach").arg(pid.to_string());
                     }
                     _ => {
-                        panic!("xctrace only supports profiling a single process at a time");
+                        bail!("xctrace only supports profiling a single process at a time");
                     }
                 }
             }
             Workload::ReadPerf(_) => {}
         }
         run(command, verbose, ignore_status);
-        Some(trace_file)
+        Ok(Some(trace_file))
     }
 
     pub fn output(
@@ -224,11 +230,11 @@ mod arch {
         _sudo: Option<Option<&str>>,
     ) -> anyhow::Result<Vec<u8>> {
         if script_no_inline {
-            return Err(anyhow::anyhow!("--no-inline is only supported on Linux"));
+            bail!("--no-inline is only supported on Linux");
         }
 
         let xctrace = env::var("XCTRACE").unwrap_or_else(|_| "xctrace".to_string());
-        let trace_file = trace_file.context("No trace file found.")?;
+        let trace_file = trace_file.context("no trace file found.")?;
         let output = Command::new(xctrace)
             .arg("export")
             .arg("--input")
@@ -236,15 +242,15 @@ mod arch {
             .arg("--xpath")
             .arg(r#"/trace-toc/*/data/table[@schema="time-profile"]"#)
             .output()
-            .context("Run xctrace export failed.")?;
+            .context("run xctrace export failed.")?;
         std::fs::remove_dir_all(&trace_file)
-            .with_context(|| anyhow!("Remove trace({}) failed.", trace_file.to_string_lossy()))?;
+            .with_context(|| anyhow!("remove trace({}) failed.", trace_file.to_string_lossy()))?;
         if !output.status.success() {
-            anyhow::bail!(format!(
+            bail!(
                 "unable to run 'xctrace export': ({}) {}",
                 output.status,
                 String::from_utf8_lossy(&output.stderr)
-            ));
+            );
         }
         Ok(output.stdout)
     }
@@ -290,7 +296,7 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: u32,
+        freq: Option<u32>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
