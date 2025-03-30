@@ -6,11 +6,23 @@ A Rust-powered flamegraph generator with additional support for
 Cargo projects! It can be used to profile anything,
 not just Rust projects! No perl or pipes required <3
 
-How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
 > [!TIP]
 > You might want to also try [samply](https://github.com/mstange/samply), which provides a more interactive UI
 > using a seamless integration with Firefox's Profiler web UI. It is also written in Rust and has better macOS support.
+
+## Quick Start
+
+Install it, and run
+```bash
+# Rust projects
+cargo flamegraph
+
+# Arbitrary binaries
+flamegraph -- /path/to/binary
+```
+
+How to use flamegraphs: [what's a flamegraph, and how can I use it to guide systems performance work?](#systems-performance-work-guided-by-flamegraphs)
 
 ## Installation
 
