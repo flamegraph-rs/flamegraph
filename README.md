@@ -15,6 +15,7 @@ Built on top of [@jonhoo's](https://github.com/jonhoo) wonderful [Inferno](https
 ## Quick Start
 
 Install it, and run
+
 ```bash
 # Rust projects
 cargo flamegraph
@@ -27,7 +28,8 @@ How to use flamegraphs: [what's a flamegraph, and how can I use it to guide syst
 
 ## Installation
 
-\[cargo-\]flamegraph supports 
+\[cargo-\]flamegraph supports
+
 - [Linux](#linux): Relies on `perf`
 - [MacOS](#macos): Relies on `dtrace`
 - [Windows](#windows): Native support with the [blondie](https://github.com/nico-abram/blondie) library. Also works with `dtrace` on Windows.
@@ -60,6 +62,7 @@ rustflags = ["-Clink-arg=-fuse-ld=/usr/local/bin/mold", "-Clink-arg=-Wl,--no-ros
 ```
 
 #### Debian (x86 and aarch)
+
 **Note**: Debian bullseye (the current stable version as of 2022) packages an outdated version of Rust which does not meet flamegraph's requirements. You should use [rustup](https://rustup.rs/) to install an up-to-date version of Rust, or upgrade to Debian bookworm (the current testing version) or newer.
 
 ```bash
@@ -67,20 +70,25 @@ sudo apt install -y linux-perf
 ```
 
 #### Ubuntu (x86)
+
 Not working on aarch, use a Debian distribution, or make a PR with your solution for Ubuntu
+
 ```bash
 sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
 #### Ubuntu/Ubuntu MATE (Raspberry Pi)
+
 ```bash
 sudo apt install linux-tools-raspi
 ```
 
-#### Pop!_OS
+#### Pop!\_OS
+
 ```bash
 sudo apt install linux-tools-common linux-tools-generic
 ```
+
 ## MacOS
 
 #### DTrace on macOS
@@ -98,7 +106,7 @@ change its behaviour.
 #### Blondie Backend
 
 This is enabled by default.
-Windows is supported out-of-the-box, thanks to [Nicolas Abram](https://github.com/nico-abram)'s excellent [blondie](https://github.com/nico-abram/blondie) library. 
+Windows is supported out-of-the-box, thanks to [Nicolas Abram](https://github.com/nico-abram)'s excellent [blondie](https://github.com/nico-abram/blondie) library.
 
 #### DTrace on Windows
 
@@ -110,6 +118,7 @@ At the moment, only `flamegraph` supports auto-completion. Supported shells are 
 `cargo-flamegraph` does not support auto-completion because it is not as straight-forward to implement for custom cargo subcommands. See [#153](https://github.com/flamegraph-rs/flamegraph/pull/153) for details.
 
 How you enable auto-completion depends on your shell, e.g.
+
 ```bash
 flamegraph --completions bash > $XDG_CONFIG_HOME/bash_completion # or /etc/bash_completion.d/
 ```
@@ -242,7 +251,6 @@ Or set the environment variable [CARGO_PROFILE_RELEASE_DEBUG=true](https://doc.r
 
 Please note that tests, unit tests and benchmarks use the `bench` profile in release mode (see [here](https://doc.rust-lang.org/cargo/reference/profiles.html#profile-selection)).
 
-
 ## Usage with benchmarks
 
 In order to perf existing benchmarks, you should set up a few configs.
@@ -252,7 +260,6 @@ Set the following in your `Cargo.toml` file to run benchmarks:
 [profile.bench]
 debug = true
 ```
-
 
 ## Use custom paths for perf and dtrace
 
@@ -294,7 +301,7 @@ flamegraph, the main function of your program will be closer to
 the bottom, and the called functions will be stacked on top,
 with the functions that they call stacked on top of them, etc...
 
-The **x-axis** spans all of the samples. It does *not* show the
+The **x-axis** spans all of the samples. It does _not_ show the
 passing of time from left to right. The left to right ordering
 has no meaning.
 
@@ -351,43 +358,43 @@ It is a good idea to use Flamegraphs to figure out what you want to
 optimize, and then set up a measurement environment that allows
 you to determine that an improvement has actually happened.
 
-* use flamegraphs to find a set of optimization targets
-* create benchmarks for these optimization targets, and if
-appropriate use something like cachegrind and cg_diff to
-[measure cpu instructions](https://github.com/spacejam/sled/blob/d521c510c3b8a7e02b8602d6db6a7701b51bd33b/hack/instructions#L26)
-and diff them against the previous version.
-* Measuring CPU instructions is often better than measuring the time it takes
-to run a workload in many cases, because it's possible that a
-background task on your machine ran and caused something to slow down
-in terms of physical time, but if you actually made an implementation
-faster, it is likely to have a stronger correlation with reduced total
-CPU instructions.
-* Time spent on the CPU is not the full picture, as time is spent
-waiting for IO to complete as well, which does not get accounted
-with tools like perf that only measure what's consuming time
-on the CPU. Check out [Brendan Gregg's article on Off-Cpu
-Accounting](http://www.brendangregg.com/offcpuanalysis.html)
-for more information about this!
+- use flamegraphs to find a set of optimization targets
+- create benchmarks for these optimization targets, and if
+  appropriate use something like cachegrind and cg_diff to
+  [measure cpu instructions](https://github.com/spacejam/sled/blob/d521c510c3b8a7e02b8602d6db6a7701b51bd33b/hack/instructions#L26)
+  and diff them against the previous version.
+- Measuring CPU instructions is often better than measuring the time it takes
+  to run a workload in many cases, because it's possible that a
+  background task on your machine ran and caused something to slow down
+  in terms of physical time, but if you actually made an implementation
+  faster, it is likely to have a stronger correlation with reduced total
+  CPU instructions.
+- Time spent on the CPU is not the full picture, as time is spent
+  waiting for IO to complete as well, which does not get accounted
+  with tools like perf that only measure what's consuming time
+  on the CPU. Check out [Brendan Gregg's article on Off-Cpu
+  Accounting](http://www.brendangregg.com/offcpuanalysis.html)
+  for more information about this!
 
 ## Performance Theory 101: Basics of Quantitative Engineering
 
-* Use realistic workloads on realistic hardware, or your data doesn't
-necessarily correspond very much with what will be happening in production
-* All of our guesses are wrong to some extent, so we have to measure
-the effects of our work. Often the simple code that doesn't seem
-like it should be fast is actually way faster than code that looks
-optimized. We need to measure our optimizations to make sure that we
-didn't make our code both harder to read AND slower.
-* Measure before you change anything, and save the results
-in a safe place! Many profiling tools will overwrite their old output
-when you run them again, so make sure you take care to save the
-data before you begin so that you can compare before and after.
-* Take measurements on a warmed up machine that isn't doing anything
-else, and has had time to cool off from the last workload.
-CPUs will fall asleep and drop into power-saving modes when idle,
-and they will also throttle if they get too hot (sometimes SIMD
-can cause things to run slower because it heats things up so much
-that the core has to throttle).
+- Use realistic workloads on realistic hardware, or your data doesn't
+  necessarily correspond very much with what will be happening in production
+- All of our guesses are wrong to some extent, so we have to measure
+  the effects of our work. Often the simple code that doesn't seem
+  like it should be fast is actually way faster than code that looks
+  optimized. We need to measure our optimizations to make sure that we
+  didn't make our code both harder to read AND slower.
+- Measure before you change anything, and save the results
+  in a safe place! Many profiling tools will overwrite their old output
+  when you run them again, so make sure you take care to save the
+  data before you begin so that you can compare before and after.
+- Take measurements on a warmed up machine that isn't doing anything
+  else, and has had time to cool off from the last workload.
+  CPUs will fall asleep and drop into power-saving modes when idle,
+  and they will also throttle if they get too hot (sometimes SIMD
+  can cause things to run slower because it heats things up so much
+  that the core has to throttle).
 
 ## Performance Theory 202: USE Method
 
@@ -424,30 +431,31 @@ high that latency becomes undesirable.
 Anyway, nearly everything in our systems can be broken down
 to be analyzed based on 3 high-level characteristics:
 
-* **Utilization** is the amount of time the system under
-measurement is actually doing useful work servicing a request,
-and can be measured as the percent of available time spent servicing
-requests
-* **Saturation** is when requests have to wait before being
-serviced. This can be measured as the queue depth over time
-* **Errors** are when things start to fail, like when queues
-are no longer able to accept any new requests - like when a TCP connection
-is rejected because the system's TCP backlog is already full of
-connections that have not yet been accept'ed by the userspace
-program.
+- **Utilization** is the amount of time the system under
+  measurement is actually doing useful work servicing a request,
+  and can be measured as the percent of available time spent servicing
+  requests
+- **Saturation** is when requests have to wait before being
+  serviced. This can be measured as the queue depth over time
+- **Errors** are when things start to fail, like when queues
+  are no longer able to accept any new requests - like when a TCP connection
+  is rejected because the system's TCP backlog is already full of
+  connections that have not yet been accept'ed by the userspace
+  program.
 
 This forms the necessary background to start applying the USE Method
 to locate the performance-related issue in your complex system!
 
 The approach is:
+
 1. Enumerate the various resources that might be behaving poorly - maybe by creating a
-flamegraph and looking for functions that are taking more of the total runtime than expected
+   flamegraph and looking for functions that are taking more of the total runtime than expected
 1. Pick one of them
 1. (Errors) Check for errors like TCP connection failures, other IO failures, bad things in logs etc...
 1. (Utilization) Measure the utilization of the system and see if its throughput is approaching
-the known maximum, or the point that it is known to experience saturation
+   the known maximum, or the point that it is known to experience saturation
 1. (Saturation) Is saturation actually happening? Are requests waiting in lines before being serviced?
-Is latency going up while throughput is staying the same?
+   Is latency going up while throughput is staying the same?
 
 These probing questions serve as a piercing flashlight for
 rapidly identifying the underlying issue most of the time.
@@ -470,10 +478,10 @@ have undertaken.
 
 If you want to drill more into theory, know the law(s)!
 
-* [Universal Law of Scalability](http://www.perfdynamics.com/Manifesto/USLscalability.html)
-is about the relationship between concurrency gains, queuing and coordination costs
-* [Amdahl's Law](https://en.wikipedia.org/wiki/Amdahl%27s_law)
-is about the theoretical maximum gain that can be made for a workload by parallelization.
-* [Little's Law](https://en.wikipedia.org/wiki/Little%27s_law)
-is a deceptively simple law with some subtle implications from queue theory
-that allows us to reason about appropriate queue lengths for our systems
+- [Universal Law of Scalability](http://www.perfdynamics.com/Manifesto/USLscalability.html)
+  is about the relationship between concurrency gains, queuing and coordination costs
+- [Amdahl's Law](https://en.wikipedia.org/wiki/Amdahl%27s_law)
+  is about the theoretical maximum gain that can be made for a workload by parallelization.
+- [Little's Law](https://en.wikipedia.org/wiki/Little%27s_law)
+  is a deceptively simple law with some subtle implications from queue theory
+  that allows us to reason about appropriate queue lengths for our systems
