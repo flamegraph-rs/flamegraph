@@ -296,7 +296,7 @@ mod arch {
     pub(crate) fn initial_command(
         workload: Workload,
         sudo: Option<Option<&str>>,
-        freq: Option<u32>,
+        freq: u32,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
