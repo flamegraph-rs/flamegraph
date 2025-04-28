@@ -13,7 +13,10 @@ use std::os::unix::process::ExitStatusExt;
 #[cfg(target_os = "linux")]
 use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+use inferno::collapse::xctrace::Folder;
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
 
 #[cfg(unix)]
@@ -167,7 +170,93 @@ mod arch {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+mod arch {
+    use super::*;
+
+    pub const SPAWN_ERROR: &str = "could not spawn xctrace";
+    pub const WAIT_ERROR: &str = "unable to wait for xctrace record child command to exit";
+
+    pub(crate) fn initial_command(
+        workload: Workload,
+        sudo: Option<Option<&str>>,
+        freq: u32,
+        custom_cmd: Option<String>,
+        verbose: bool,
+        ignore_status: bool,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        if freq != 997 {
+            bail!("xctrace doesn't support custom frequency");
+        }
+        if custom_cmd.is_some() {
+            bail!("xctrace doesn't support custom command");
+        }
+        let xctrace = env::var("XCTRACE").unwrap_or_else(|_| "xctrace".to_string());
+        let trace_file = PathBuf::from("cargo-flamegraph.trace");
+        let mut command = sudo_command(&xctrace, sudo);
+        command
+            .arg("record")
+            .arg("--template")
+            .arg("Time Profiler")
+            .arg("--target-stdout")
+            .arg("-")
+            .arg("--output")
+            .arg(&trace_file);
+        match workload {
+            Workload::Command(args) => {
+                command.arg("--launch").arg("--").args(args);
+            }
+            Workload::Pid(pid) => {
+                match &*pid {
+                    [pid] => {
+                        // xctrace could accept multiple --attach <pid> arguments,
+                        // but it will only profiling on the last pid provided.
+                        command.arg("--attach").arg(pid.to_string());
+                    }
+                    _ => {
+                        bail!("xctrace only supports profiling a single process at a time");
+                    }
+                }
+            }
+            Workload::ReadPerf(_) => {}
+        }
+        run(command, verbose, ignore_status);
+        Ok(Some(trace_file))
+    }
+
+    pub fn output(
+        trace_file: Option<PathBuf>,
+        script_no_inline: bool,
+        _sudo: Option<Option<&str>>,
+    ) -> anyhow::Result<Vec<u8>> {
+        if script_no_inline {
+            bail!("--no-inline is only supported on Linux");
+        }
+
+        let xctrace = env::var("XCTRACE").unwrap_or_else(|_| "xctrace".to_string());
+        let trace_file = trace_file.context("no trace file found.")?;
+        let output = Command::new(xctrace)
+            .arg("export")
+            .arg("--input")
+            .arg(&trace_file)
+            .arg("--xpath")
+            .arg(r#"/trace-toc/*/data/table[@schema="time-profile"]"#)
+            .output()
+            .context("run xctrace export failed.")?;
+        std::fs::remove_dir_all(&trace_file)
+            .with_context(|| anyhow!("remove trace({}) failed.", trace_file.to_string_lossy()))?;
+        if !output.status.success() {
+            bail!(
+                "unable to run 'xctrace export': ({}) {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(output.stdout)
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 mod arch {
     use super::*;
 
@@ -359,7 +448,10 @@ fn run(mut command: Command, verbose: bool, ignore_status: bool) {
     // latter case usually means the user interrupted
     // it in some way)
     if !ignore_status && terminated_by_error(exit_status) {
-        eprintln!("failed to sample program");
+        eprintln!(
+            "failed to sample program, exited with code: {:?}",
+            exit_status.code()
+        );
         exit(1);
     }
 }
@@ -370,6 +462,8 @@ fn terminated_by_error(status: ExitStatus) -> bool {
         .signal() // the default needs to be true because that's the neutral element for `&&`
         .map_or(true, |code| code != SIGINT && code != SIGTERM)
         && !status.success()
+        // on macOS, xctrace captures Ctrl+C and exits with code 54
+        && !(cfg!(target_os = "macos") && status.code() == Some(54))
 }
 
 #[cfg(not(unix))]
@@ -426,15 +520,23 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let collapsed_writer = BufWriter::new(&mut collapsed);
 
-    #[allow(unused_mut)]
-    let mut collapse_options = CollapseOptions::default();
-
     #[cfg(target_os = "linux")]
-    {
+    let mut folder = {
+        let mut collapse_options = CollapseOptions::default();
         collapse_options.skip_after = opts.flamegraph_options.skip_after.clone();
-    }
+        Folder::from(collapse_options)
+    };
 
-    Folder::from(collapse_options)
+    #[cfg(target_os = "macos")]
+    let mut folder = Folder::default();
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    let mut folder = {
+        let collapse_options = CollapseOptions::default();
+        Folder::from(collapse_options)
+    };
+
+    folder
         .collapse(perf_reader, collapsed_writer)
         .context("unable to collapse generated profile data")?;
 
