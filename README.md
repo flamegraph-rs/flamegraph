@@ -31,7 +31,7 @@ How to use flamegraphs: [what's a flamegraph, and how can I use it to guide syst
 \[cargo-\]flamegraph supports
 
 - [Linux](#linux): relies on `perf`
-- [MacOS](#macos): relies on `dtrace`
+- [MacOS](#macos): relies on `xctrace`
 - [Windows](#windows): native support with the [blondie](https://github.com/nico-abram/blondie) library; also works with `dtrace` on Windows
 
 `cargo install flamegraph` will make the `flamegraph` and `cargo-flamegraph` binaries available in
