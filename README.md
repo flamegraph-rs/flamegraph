@@ -83,18 +83,6 @@ sudo apt install linux-tools-raspi
 sudo apt install linux-tools-common linux-tools-generic
 ```
 
-## MacOS
-
-#### DTrace on macOS
-
-On macOS, there is no alternative to running as superuser in order to
-enable DTrace. This should be done by invoking `sudo flamegraph ...` or
-`cargo flamegraph --root ...`. Do not do `sudo cargo flamegraph ...`;
-this can cause problems due to Cargo's build system being run as root.
-
-Be aware that if the binary being tested is user-aware, this does
-change its behaviour.
-
 ## Windows
 
 #### Blondie Backend
