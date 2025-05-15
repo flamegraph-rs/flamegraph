@@ -75,6 +75,8 @@ mod arch {
         let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,64000 -g"));
 
         let mut perf_output = None;
+        let mut perf_pid = None;
+
         let mut args = args.split_whitespace();
         while let Some(arg) = args.next() {
             command.arg(arg);
@@ -88,6 +90,15 @@ mod arch {
                 command.arg(next_arg);
                 perf_output = Some(PathBuf::from(next_arg));
             }
+
+            // Detect if user is setting `perf record`
+            // pid file with `-p`. If so save this to check
+            // to see if the workload can be ignored.
+            if arg == "-p" || arg == "--pid" {
+                let next_arg = args.next().context("missing '-p' argument")?;
+                perf_pid = Some(next_arg);
+                command.arg(next_arg);
+            }
         }
 
         let perf_output = match perf_output {
@@ -99,24 +110,29 @@ mod arch {
             }
         };
 
-        match workload {
-            Workload::Command(c) => {
-                command.args(&c);
-            }
-            Workload::Pid(p) => {
-                if let Some((first, pids)) = p.split_first() {
-                    let mut arg = first.to_string();
-
-                    for pid in pids {
-                        arg.push(',');
-                        arg.push_str(&pid.to_string());
+        if perf_pid.is_none() {
+            match workload {
+                Workload::Command(c) => {
+                    if c.is_empty() {
+                        return Err(anyhow!("no workload given to generate a flamegraph for"));
                     }
-
-                    command.arg("-p");
-                    command.arg(arg);
+                    command.args(&c);
                 }
+                Workload::Pid(p) => {
+                    if let Some((first, pids)) = p.split_first() {
+                        let mut arg = first.to_string();
+
+                        for pid in pids {
+                            arg.push(',');
+                            arg.push_str(&pid.to_string());
+                        }
+
+                        command.arg("-p");
+                        command.arg(arg);
+                    }
+                }
+                Workload::ReadPerf(_) => (),
             }
-            Workload::ReadPerf(_) => (),
         }
 
         run(command, verbose, ignore_status);
