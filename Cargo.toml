@@ -25,7 +25,7 @@ clap = { version = "4.0.11", features = ["derive"] }
 clap_complete = "4.0.2"
 indicatif = "0.17.8"
 inferno = { version = "0.12.2", default-features = false, features = ["multithreaded", "nameattr"] }
-opener = "0.7.1"
+opener = "0.8.1"
 shlex = "1.1.0"
 rustc-demangle = { version = "0.1", features = ["std"] }
 
