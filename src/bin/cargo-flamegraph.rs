@@ -347,7 +347,7 @@ fn find_unique_target(
         .packages
         .into_iter()
         .filter(|p| match pkg {
-            Some(pkg) => pkg == p.name,
+            Some(pkg) => pkg == *p.name,
             None => p.manifest_path.starts_with(&crate_root),
         })
         .peekable();
@@ -395,7 +395,7 @@ fn find_unique_target(
                 }
 
                 Some(BinaryTarget {
-                    package: name.clone(),
+                    package: name.as_ref().to_owned(),
                     target: t.name,
                     kind: t.kind,
                 })
