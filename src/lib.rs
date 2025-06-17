@@ -198,19 +198,22 @@ mod arch {
             .arg("record")
             .arg("--template")
             .arg("Time Profiler")
-            .arg("--target-stdout")
-            .arg("-")
             .arg("--output")
             .arg(&trace_file);
         match workload {
             Workload::Command(args) => {
-                command.arg("--launch").arg("--").args(args);
+                command
+                    .arg("--target-stdout")
+                    .arg("-")
+                    .arg("--launch")
+                    .arg("--")
+                    .args(args);
             }
             Workload::Pid(pid) => {
                 match &*pid {
                     [pid] => {
                         // xctrace could accept multiple --attach <pid> arguments,
-                        // but it will only profiling on the last pid provided.
+                        // but it will only profile the last pid provided.
                         command.arg("--attach").arg(pid.to_string());
                     }
                     _ => {
