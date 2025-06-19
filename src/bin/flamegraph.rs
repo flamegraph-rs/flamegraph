@@ -49,7 +49,7 @@ fn main() -> anyhow::Result<()> {
             (false, true) => Workload::Pid(opt.pid),
             (true, false) => Workload::Command(opt.trailing_arguments.clone()),
             (false, false) => return Err(anyhow!("cannot pass in command with --pid")),
-            (true, true) => return Err(anyhow!("no workload given to generate a flamegraph for")),
+            (true, true) => Workload::Pid(vec![]),
         }
     };
     flamegraph::generate_flamegraph_for_workload(workload, opt.graph)
