@@ -23,7 +23,7 @@ anyhow = "1.0.43"
 cargo_metadata = "0.20"
 clap = { version = "4.0.11", features = ["derive"] }
 clap_complete = "4.0.2"
-indicatif = "0.17.8"
+indicatif = "0.18.0"
 inferno = { version = "0.12.2", default-features = false, features = ["multithreaded", "nameattr"] }
 opener = "0.8.1"
 shlex = "1.1.0"
