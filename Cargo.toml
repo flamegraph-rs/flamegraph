@@ -1,6 +1,6 @@
 [package]
 name = "flamegraph"
-version = "0.6.8"
+version = "0.6.9"
 edition = "2021"
 rust-version = "1.78"
 description = "A simple cargo subcommand for generating flamegraphs, using inferno under the hood"
