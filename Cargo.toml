@@ -20,7 +20,7 @@ path = "src/bin/flamegraph.rs"
 
 [dependencies]
 anyhow = "1.0.43"
-cargo_metadata = "0.22"
+cargo_metadata = "0.23"
 clap = { version = "4.0.11", features = ["derive"] }
 clap_complete = "4.0.2"
 indicatif = "0.18.0"
