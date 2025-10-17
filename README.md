@@ -71,6 +71,31 @@ Not working on aarch, use a Debian distribution, or make a PR with your solution
 sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
 
+#### Ubuntu (aarch)
+
+```bash
+sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+```
+
+**Note:** The perf binary is not packaged for all kernel versions. A check and workaround is below.
+
+```bash
+# Check if the perf binary is missing:
+ls -l /usr/lib/linux-tools/`uname -r`/ | grep perf
+
+# If it is there, you can stop here.
+# If is missing, check if you have the tools for another kernel version installed:
+ls -l /usr/lib/linux-tools/
+
+# If you do, check it contains perf:
+# (replace <FROM_KERNEL>)
+ls -l /usr/lib/linux_tools/<FROM_KERNEL>/
+
+# If you do, symlink it. This has been tested with 6.14.0-1014-aws running perf from 6.8.0-85-generic
+# (replace <FROM_KERNEL> as before)
+sudo ln -s /usr/lib/linux-tools/<FROM_KERNEL>/perf /usr/lib/linux-tools/`uname -r`/perf
+```
+
 #### Ubuntu/Ubuntu MATE (Raspberry Pi)
 
 ```bash
