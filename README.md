@@ -65,8 +65,6 @@ sudo apt install -y linux-perf
 
 #### Ubuntu (x86)
 
-Not working on aarch, use a Debian distribution, or make a PR with your solution for Ubuntu
-
 ```bash
 sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
 ```
