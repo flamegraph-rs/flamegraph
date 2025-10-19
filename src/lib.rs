@@ -336,14 +336,14 @@ mod arch {
                 #[cfg(target_os = "windows")]
                 {
                     let mut help_test = crate::arch::base_dtrace_command(None);
-
+                    let if_dtrace_enabled = std::env::var("DTRACE").is_ok();
                     let dtrace_found = help_test
                         .arg("--help")
                         .stderr(Stdio::null())
                         .stdout(Stdio::null())
                         .status()
                         .is_ok();
-                    if !dtrace_found {
+                    if !dtrace_found || !if_dtrace_enabled {
                         let mut command_builder = Command::new(&c[0]);
                         command_builder.args(&c[1..]);
                         print_command(&command_builder, verbose);
