@@ -115,7 +115,7 @@ Windows is supported out-of-the-box, thanks to [Nicolas Abram](https://github.co
 
 #### DTrace on Windows
 
-Alternatively, one can [install DTrace on Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/dtrace). If found, flamegraph will always prefer using `dtrace` over the built-in Windows support.
+Alternatively, one can [install DTrace on Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/dtrace). You need to set the DTRACE environment variable to the path of the DTrace executable or if it is in the PATH set the DTRACE="dtrace".
 
 ## Shell auto-completion
 
