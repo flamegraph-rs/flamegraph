@@ -261,6 +261,7 @@ mod arch {
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 mod arch {
+    #[cfg(target_os = "windows")]
     use super::*;
 
     pub const SPAWN_ERROR: &str = "could not spawn dtrace";
@@ -320,8 +321,9 @@ mod arch {
         command.arg("-o");
         command.arg("cargo-flamegraph.stacks");
 
-        match workload {
-            Workload::Command(c) => {
+        match (workload, env::var("DTRACE")) {
+            #[cfg(not(target_os = "windows"))]
+            (Workload::Command(c), _) => {
                 let mut escaped = String::new();
                 for (i, arg) in c.iter().enumerate() {
                     if i > 0 {
@@ -332,43 +334,66 @@ mod arch {
 
                 command.arg("-c");
                 command.arg(&escaped);
+            }
+            #[cfg(target_os = "windows")]
+            (Workload::Command(c), Ok(_)) => {
+                let mut help_test = crate::arch::base_dtrace_command(None);
+                let dtrace_found = help_test
+                    .arg("--help")
+                    .stderr(Stdio::null())
+                    .stdout(Stdio::null())
+                    .status()
+                    .is_ok();
+                if !dtrace_found {
+                    let mut command_builder = Command::new(&c[0]);
+                    command_builder.args(&c[1..]);
+                    print_command(&command_builder, verbose);
 
-                #[cfg(target_os = "windows")]
-                {
-                    let mut help_test = crate::arch::base_dtrace_command(None);
-                    let if_dtrace_enabled = std::env::var("DTRACE").is_ok();
-                    let dtrace_found = help_test
-                        .arg("--help")
-                        .stderr(Stdio::null())
-                        .stdout(Stdio::null())
-                        .status()
-                        .is_ok();
-                    if !dtrace_found || !if_dtrace_enabled {
-                        let mut command_builder = Command::new(&c[0]);
-                        command_builder.args(&c[1..]);
-                        print_command(&command_builder, verbose);
+                    let trace = blondie::trace_command(command_builder, false).map_err(|err| {
+                        anyhow!(
+                            "dtrace is not working and could not profile using blondie: {err:?}"
+                        )
+                    })?;
 
-                        let trace = blondie::trace_command(command_builder, false)
-                            .map_err(|err| anyhow!("could not find dtrace and could not profile using blondie: {err:?}"))?;
+                    let f = std::fs::File::create("./cargo-flamegraph.stacks")
+                        .context("unable to create temporary file 'cargo-flamegraph.stacks'")?;
+                    let mut f = std::io::BufWriter::new(f);
+                    trace.write_dtrace(&mut f).map_err(|err| {
+                        anyhow!(
+                            "unable to write dtrace output to 'cargo-flamegraph.stacks': {err:?}"
+                        )
+                    })?;
 
-                        let f = std::fs::File::create("./cargo-flamegraph.stacks")
-                            .context("unable to create temporary file 'cargo-flamegraph.stacks'")?;
-                        let mut f = std::io::BufWriter::new(f);
-                        trace.write_dtrace(&mut f).map_err(|err| {
-                            anyhow!("unable to write dtrace output to 'cargo-flamegraph.stacks': {err:?}")
-                        })?;
-
-                        return Ok(None);
-                    }
+                    return Ok(None);
                 }
             }
-            Workload::Pid(p) => {
+            #[cfg(target_os = "windows")]
+            (Workload::Command(c), Err(_)) => {
+                let mut command_builder = Command::new(&c[0]);
+                command_builder.args(&c[1..]);
+                print_command(&command_builder, verbose);
+
+                let trace = blondie::trace_command(command_builder, false).map_err(|err| {
+                    anyhow!("dtrace is not working and could not profile using blondie: {err:?}")
+                })?;
+
+                let f = std::fs::File::create("./cargo-flamegraph.stacks")
+                    .context("unable to create temporary file 'cargo-flamegraph.stacks'")?;
+                let mut f = std::io::BufWriter::new(f);
+                trace.write_dtrace(&mut f).map_err(|err| {
+                    anyhow!("unable to write dtrace output to 'cargo-flamegraph.stacks': {err:?}")
+                })?;
+
+                return Ok(None);
+            }
+
+            (Workload::Pid(p), _) => {
                 for p in p {
                     command.arg("-p");
                     command.arg(p.to_string());
                 }
             }
-            Workload::ReadPerf(_) => (),
+            (Workload::ReadPerf(_), _) => (),
         }
 
         run(command, verbose, ignore_status);
