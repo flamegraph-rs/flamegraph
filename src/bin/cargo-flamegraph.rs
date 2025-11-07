@@ -236,7 +236,7 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
             a.executable
                 .as_deref()
                 .filter(|_| {
-                    a.target.name == *target && a.target.kind.iter().any(|k| kind.contains(&k))
+                    a.target.name == *target && a.target.kind.iter().any(|k| kind.contains(k))
                 })
                 .map(|e| (&a.profile.debuginfo, e))
         })
@@ -379,7 +379,7 @@ fn find_unique_target(
             }
             targets.into_iter().filter_map(move |t| {
                 // Keep only targets that are of the right kind.
-                if !t.kind.iter().any(|s| kind.contains(&s)) {
+                if !t.kind.iter().any(|s| kind.contains(s)) {
                     return None;
                 }
 
