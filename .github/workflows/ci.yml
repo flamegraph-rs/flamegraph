@@ -17,37 +17,14 @@ jobs:
           - macOS-latest
           - windows-latest
     runs-on: ${{ matrix.os }}
-    env:
-      RUSTFLAGS: "--deny warnings"
     steps:
     - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
         toolchain: stable
-        override: true
-    - uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: --all-targets
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
         components: rustfmt, clippy
-    - name: Check code formatting
-      run: cargo fmt -- --check
-    - name: Run Clippy
-      uses: actions-rs/clippy-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        args: --all-features
+    - run: cargo clippy --all-targets --all-features -- -D warnings
+    - run: cargo fmt -- --check
 
   audit:
     runs-on: ubuntu-latest
