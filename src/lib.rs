@@ -38,6 +38,7 @@ pub enum Workload {
 
 #[cfg(target_os = "linux")]
 mod arch {
+    use std::fmt::Write;
     use std::time::Duration;
 
     use indicatif::{ProgressBar, ProgressStyle};
@@ -51,6 +52,7 @@ mod arch {
         workload: Workload,
         sudo: Option<Option<&str>>,
         freq: u32,
+        compress_level: Option<u8>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
@@ -72,7 +74,13 @@ mod arch {
         };
         let mut command = sudo_command(&perf, sudo);
 
-        let args = custom_cmd.unwrap_or(format!("record -F {freq} --call-graph dwarf,64000 -g"));
+        let args = custom_cmd.unwrap_or_else(|| {
+            let mut args = format!("record -F {freq} --call-graph dwarf,64000 -g");
+            if let Some(z) = compress_level {
+                _ = write!(args, " -z={z}");
+            }
+            args
+        });
 
         let mut perf_output = None;
         let mut args = args.split_whitespace();
@@ -181,6 +189,7 @@ mod arch {
         workload: Workload,
         sudo: Option<Option<&str>>,
         freq: u32,
+        _compress_level: Option<u8>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
@@ -300,6 +309,7 @@ mod arch {
         workload: Workload,
         sudo: Option<Option<&str>>,
         freq: u32,
+        _compress_level: Option<u8>,
         custom_cmd: Option<String>,
         verbose: bool,
         ignore_status: bool,
@@ -497,10 +507,16 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
     let perf_output = if let Workload::ReadPerf(perf_file) = workload {
         Some(perf_file)
     } else {
+        #[cfg(target_os = "linux")]
+        let compression = opts.compression_level;
+        #[cfg(not(target_os = "linux"))]
+        let compression = None;
+
         arch::initial_command(
             workload,
             sudo,
             opts.frequency(),
+            compression,
             opts.custom_cmd,
             opts.verbose,
             opts.ignore_status,
@@ -633,6 +649,11 @@ pub struct Options {
     /// Sampling frequency in Hz [default: 997]
     #[clap(short = 'F', long = "freq")]
     frequency: Option<u32>,
+
+    /// Produce compressed trace using the specified level. perf only.
+    #[cfg(target_os = "linux")]
+    #[clap(short = 'z', long, num_args=0..=1, default_missing_value = "1")]
+    compression_level: Option<u8>,
 
     /// Custom command for invoking perf/dtrace
     #[clap(short, long = "cmd")]
