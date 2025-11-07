@@ -19,3 +19,8 @@ updates:
   - dependency-name: signal-hook
     versions:
     - "> 0.3.10, < 0.4"
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: weekly
+    time: "06:28"
