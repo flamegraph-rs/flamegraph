@@ -87,7 +87,7 @@ ls -l /usr/lib/linux-tools/
 
 # If you do, check it contains perf:
 # (replace <FROM_KERNEL>)
-ls -l /usr/lib/linux_tools/<FROM_KERNEL>/
+ls -l /usr/lib/linux-tools/<FROM_KERNEL>/
 
 # If you do, symlink it. This has been tested with 6.14.0-1014-aws running perf from 6.8.0-85-generic
 # (replace <FROM_KERNEL> as before)
