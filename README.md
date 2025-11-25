@@ -18,7 +18,7 @@ Install it, and run
 
 ```bash
 # Rust projects
-cargo flamegraph
+cargo install flamegraph
 
 # Arbitrary binaries
 flamegraph -- /path/to/binary
