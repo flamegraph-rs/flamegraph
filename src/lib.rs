@@ -29,6 +29,9 @@ use clap::{
     Args,
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
+#[cfg(not(target_os = "macos"))]
+use rustc_demangle::demangle_stream;
+#[cfg(target_os = "macos")]
 use rustc_demangle::try_demangle;
 
 pub enum Workload {
@@ -491,6 +494,7 @@ fn print_command(cmd: &Command, verbose: bool) {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
     use quick_xml::events::Event;
 
@@ -512,6 +516,8 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+#[inline]
 fn demangle_element(
     element: quick_xml::events::BytesStart,
 ) -> std::io::Result<quick_xml::events::BytesStart> {
@@ -527,6 +533,8 @@ fn demangle_element(
     Ok(new_element)
 }
 
+#[cfg(target_os = "macos")]
+#[inline]
 fn demangle_attribute(attribute: &mut quick_xml::events::attributes::Attribute) {
     let Ok(mangled) = str::from_utf8(&attribute.value) else {
         return;
@@ -582,8 +590,12 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let mut demangled_output = vec![];
 
-    demangle_stream(&mut Cursor::new(output), &mut demangled_output)
-        .context("unable to demangle")?;
+    #[cfg(not(target_os = "macos"))]
+    let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output, false);
+    #[cfg(target_os = "macos")]
+    let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output);
+
+    demangle_result.context("unable to demangle")?;
 
     let perf_reader = BufReader::new(&*demangled_output);
 
