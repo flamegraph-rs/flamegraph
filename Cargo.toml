@@ -30,7 +30,7 @@ shlex = "1.1.0"
 rustc-demangle = { version = "0.1", features = ["std"] }
 
 [target.'cfg(unix)'.dependencies]
-signal-hook = "0.4.1"
+signal-hook = "0.4.3"
 
 [target.'cfg(windows)'.dependencies]
 blondie = "0.5.2"
