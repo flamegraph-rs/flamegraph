@@ -150,7 +150,7 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
     if let Some(Some(ref unit_test)) = opt.unit_test {
         match kind
             .iter()
-            .any(|k| [TargetKind::Lib, TargetKind::RLib].contains(k))
+            .any(|k| matches!(k, TargetKind::Lib | TargetKind::RLib))
         {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_test]),
@@ -160,7 +160,7 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
     if let Some(Some(ref unit_bench)) = opt.unit_bench {
         match kind
             .iter()
-            .any(|k| [TargetKind::Lib, TargetKind::RLib].contains(k))
+            .any(|k| matches!(k, TargetKind::Lib | TargetKind::RLib))
         {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_bench]),
