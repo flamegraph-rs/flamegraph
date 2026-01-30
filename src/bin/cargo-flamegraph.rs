@@ -148,14 +148,20 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
     }
 
     if let Some(Some(ref unit_test)) = opt.unit_test {
-        match kind.iter().any(|k| k == &TargetKind::Lib) {
+        match kind
+            .iter()
+            .any(|k| matches!(k, TargetKind::Lib | TargetKind::RLib))
+        {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_test]),
         };
     }
 
     if let Some(Some(ref unit_bench)) = opt.unit_bench {
-        match kind.iter().any(|k| k == &TargetKind::Lib) {
+        match kind
+            .iter()
+            .any(|k| matches!(k, TargetKind::Lib | TargetKind::RLib))
+        {
             true => cmd.arg("--lib"),
             false => cmd.args(["--bin", unit_bench]),
         };
@@ -218,13 +224,13 @@ fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {
         Opt {
             unit_test: Some(Some(t)),
             ..
-        } => (&[TargetKind::Lib, TargetKind::Bin], t),
+        } => (&[TargetKind::Lib, TargetKind::RLib, TargetKind::Bin], t),
         Opt {
             unit_bench: Some(Some(t)),
             ..
         } => {
             trailing_arguments.push("--bench".to_string());
-            (&[TargetKind::Lib, TargetKind::Bin], t)
+            (&[TargetKind::Lib, TargetKind::RLib, TargetKind::Bin], t)
         }
         _ => return Err(anyhow!("no target for profiling")),
     };
@@ -449,8 +455,8 @@ fn main() -> anyhow::Result<()> {
     } else if let Some(unit_test) = opt.unit_test {
         let kinds = match opt.unit_test_kind {
             Some(UnitTestTargetKind::Bin) => &[TargetKind::Bin][..], // get slice to help type inference
-            Some(UnitTestTargetKind::Lib) => &[TargetKind::Lib],
-            None => &[TargetKind::Bin, TargetKind::Lib],
+            Some(UnitTestTargetKind::Lib) => &[TargetKind::Lib, TargetKind::RLib],
+            None => &[TargetKind::Bin, TargetKind::Lib, TargetKind::RLib],
         };
 
         let target = find_unique_target(
@@ -464,7 +470,7 @@ fn main() -> anyhow::Result<()> {
         target.kind
     } else if let Some(unit_bench) = opt.unit_bench {
         let target = find_unique_target(
-            &[TargetKind::Bin, TargetKind::Lib],
+            &[TargetKind::Bin, TargetKind::Lib, TargetKind::RLib],
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_bench.as_deref(),
