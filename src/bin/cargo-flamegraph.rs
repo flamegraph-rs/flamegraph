@@ -49,8 +49,8 @@ struct Opt {
     #[clap(long, group = "exec-args")]
     unit_test: Option<Option<String>>,
 
-    /// Kind of target (lib or bin) when running with <unit-test> which is may be
-    /// required when we have two targets with the same name.
+    /// Kind of target (lib or bin) when running with <unit-test> or <unit-bench> which is
+    /// may be required when we have two targets with the same name.
     #[clap(long)]
     unit_test_kind: Option<UnitTestTargetKind>,
 
@@ -469,8 +469,14 @@ fn main() -> anyhow::Result<()> {
         opt.package = Some(target.package);
         target.kind
     } else if let Some(unit_bench) = opt.unit_bench {
+        let kinds = match opt.unit_test_kind {
+            Some(UnitTestTargetKind::Bin) => &[TargetKind::Bin][..],
+            Some(UnitTestTargetKind::Lib) => &[TargetKind::Lib, TargetKind::RLib],
+            None => &[TargetKind::Bin, TargetKind::Lib, TargetKind::RLib],
+        };
+
         let target = find_unique_target(
-            &[TargetKind::Bin, TargetKind::Lib, TargetKind::RLib],
+            kinds,
             opt.package.as_deref(),
             opt.manifest_path.as_deref(),
             unit_bench.as_deref(),
