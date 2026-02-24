@@ -1,7 +1,8 @@
 use std::{
+    borrow::Cow,
     env,
     fs::File,
-    io::{BufReader, BufWriter, Cursor, Read, Write},
+    io::{BufRead, BufReader, BufWriter, Cursor, Error, ErrorKind, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
     str::FromStr,
@@ -28,7 +29,7 @@ use clap::{
     Args,
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
-use rustc_demangle::demangle_stream;
+use rustc_demangle::try_demangle;
 
 pub enum Workload {
     Command(Vec<String>),
@@ -490,6 +491,57 @@ fn print_command(cmd: &Command, verbose: bool) {
     }
 }
 
+fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
+    use quick_xml::events::Event;
+
+    let mut reader = quick_xml::Reader::from_reader(input);
+    let mut writer = quick_xml::Writer::new(output);
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(el)) => writer.write_event(Event::Start(demangle_element(el)?))?,
+            Ok(Event::Empty(el)) => writer.write_event(Event::Empty(demangle_element(el)?))?,
+            Ok(el) => writer.write_event(el)?,
+            Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
+        }
+        buf.clear();
+    }
+
+    Ok(())
+}
+
+fn demangle_element(
+    element: quick_xml::events::BytesStart,
+) -> std::io::Result<quick_xml::events::BytesStart> {
+    let mut new_element = element.clone();
+    new_element.clear_attributes();
+
+    for attr in element.attributes() {
+        let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+        demangle_attribute(&mut attr);
+        new_element.push_attribute(attr);
+    }
+
+    Ok(new_element)
+}
+
+fn demangle_attribute(attribute: &mut quick_xml::events::attributes::Attribute) {
+    let Ok(mangled) = str::from_utf8(&attribute.value) else {
+        return;
+    };
+
+    if let Ok(demangled) = try_demangle(mangled) {
+        let demangled = format!("{:#}", demangled);
+
+        attribute.value = match quick_xml::escape::escape(demangled) {
+            Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
+            Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+        };
+    }
+}
+
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -530,7 +582,7 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let mut demangled_output = vec![];
 
-    demangle_stream(&mut Cursor::new(output), &mut demangled_output, false)
+    demangle_stream(&mut Cursor::new(output), &mut demangled_output)
         .context("unable to demangle")?;
 
     let perf_reader = BufReader::new(&*demangled_output);
