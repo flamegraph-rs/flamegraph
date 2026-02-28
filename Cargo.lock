@@ -455,6 +455,7 @@ dependencies = [
  "indicatif",
  "inferno",
  "opener",
+ "quick-xml",
  "rustc-demangle",
  "shlex",
  "signal-hook",
