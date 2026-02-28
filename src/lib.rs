@@ -526,28 +526,22 @@ fn demangle_element(
 
     for attr in element.attributes() {
         let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-        demangle_attribute(&mut attr);
+
+        let mangled = String::from_utf8_lossy(attr.value.as_ref());
+
+        if let Ok(demangled) = try_demangle(&mangled) {
+            let demangled = format!("{:#}", demangled);
+
+            attr.value = match quick_xml::escape::escape(demangled) {
+                Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
+                Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+            };
+        }
+
         new_element.push_attribute(attr);
     }
 
     Ok(new_element)
-}
-
-#[cfg(target_os = "macos")]
-#[inline]
-fn demangle_attribute(attribute: &mut quick_xml::events::attributes::Attribute) {
-    let Ok(mangled) = str::from_utf8(&attribute.value) else {
-        return;
-    };
-
-    if let Ok(demangled) = try_demangle(mangled) {
-        let demangled = format!("{:#}", demangled);
-
-        attribute.value = match quick_xml::escape::escape(demangled) {
-            Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
-            Cow::Owned(s) => Cow::Owned(s.into_bytes()),
-        };
-    }
 }
 
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
