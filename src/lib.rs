@@ -1,8 +1,7 @@
 use std::{
-    borrow::Cow,
     env,
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Cursor, Error, ErrorKind, Read, Write},
+    io::{BufReader, BufWriter, Cursor, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
     str::FromStr,
@@ -15,7 +14,17 @@ use std::os::unix::process::ExitStatusExt;
 use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 
 #[cfg(target_os = "macos")]
-use inferno::collapse::xctrace::Folder;
+use {
+    inferno::collapse::xctrace::Folder,
+    rustc_demangle::try_demangle,
+    std::{
+        borrow::Cow,
+        io::{BufRead, Error, ErrorKind},
+    },
+};
+
+#[cfg(not(target_os = "macos"))]
+use rustc_demangle::demangle_stream;
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
@@ -29,10 +38,6 @@ use clap::{
     Args,
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
-#[cfg(not(target_os = "macos"))]
-use rustc_demangle::demangle_stream;
-#[cfg(target_os = "macos")]
-use rustc_demangle::try_demangle;
 
 pub enum Workload {
     Command(Vec<String>),
