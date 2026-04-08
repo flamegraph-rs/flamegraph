@@ -27,7 +27,7 @@ use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 use inferno::collapse::xctrace::Folder;
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 #[cfg(target_os = "macos")]
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::Event;
 #[cfg(not(target_os = "macos"))]
 use rustc_demangle::demangle_stream;
 #[cfg(target_os = "macos")]
@@ -502,43 +502,40 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
     let mut buf = Vec::new();
 
     loop {
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Eof) => break,
-            Ok(Event::Start(el)) => writer.write_event(Event::Start(demangle_element(el)?))?,
-            Ok(Event::Empty(el)) => writer.write_event(Event::Empty(demangle_element(el)?))?,
-            Ok(el) => writer.write_event(el)?,
-            Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
-        }
         buf.clear();
+        let start = match reader.read_event_into(&mut buf) {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(start)) => start,
+            Ok(Event::Empty(start)) => start,
+            Ok(el) => {
+                writer.write_event(el)?;
+                continue;
+            }
+            Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
+        };
+
+        let mut new = start.clone();
+        new.clear_attributes();
+
+        for attr in start.attributes() {
+            let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+            let mangled = String::from_utf8_lossy(attr.value.as_ref());
+
+            if let Ok(demangled) = try_demangle(&mangled) {
+                let demangled = format!("{demangled:#}");
+                attr.value = match quick_xml::escape::escape(demangled) {
+                    Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
+                    Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+                };
+            }
+
+            new.push_attribute(attr);
+        }
+
+        writer.write_event(Event::Start(new))?;
     }
 
     Ok(())
-}
-
-#[cfg(target_os = "macos")]
-#[inline]
-fn demangle_element(element: BytesStart) -> std::io::Result<BytesStart> {
-    let mut new_element = element.clone();
-    new_element.clear_attributes();
-
-    for attr in element.attributes() {
-        let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-
-        let mangled = String::from_utf8_lossy(attr.value.as_ref());
-
-        if let Ok(demangled) = try_demangle(&mangled) {
-            let demangled = format!("{:#}", demangled);
-
-            attr.value = match quick_xml::escape::escape(demangled) {
-                Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
-                Cow::Owned(s) => Cow::Owned(s.into_bytes()),
-            };
-        }
-
-        new_element.push_attribute(attr);
-    }
-
-    Ok(new_element)
 }
 
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
