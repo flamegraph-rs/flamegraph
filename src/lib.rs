@@ -1,3 +1,10 @@
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(target_os = "macos")]
+use std::{
+    borrow::Cow,
+    io::{BufRead, Error, ErrorKind},
+};
 use std::{
     env,
     fs::File,
@@ -7,37 +14,26 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
-
-#[cfg(target_os = "linux")]
-use inferno::collapse::perf::{Folder, Options as CollapseOptions};
-
-#[cfg(target_os = "macos")]
-use {
-    inferno::collapse::xctrace::Folder,
-    rustc_demangle::try_demangle,
-    std::{
-        borrow::Cow,
-        io::{BufRead, Error, ErrorKind},
-    },
-};
-
-#[cfg(not(target_os = "macos"))]
-use rustc_demangle::demangle_stream;
-
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
-
-#[cfg(unix)]
-use signal_hook::consts::{SIGINT, SIGTERM};
-
 use anyhow::{anyhow, bail, Context};
 use clap::{
     builder::{PossibleValuesParser, TypedValueParser},
     Args,
 };
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
+#[cfg(target_os = "linux")]
+use inferno::collapse::perf::{Folder, Options as CollapseOptions};
+#[cfg(target_os = "macos")]
+use inferno::collapse::xctrace::Folder;
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
+#[cfg(target_os = "macos")]
+use quick_xml::events::{BytesStart, Event};
+#[cfg(not(target_os = "macos"))]
+use rustc_demangle::demangle_stream;
+#[cfg(target_os = "macos")]
+use rustc_demangle::try_demangle;
+#[cfg(unix)]
+use signal_hook::consts::{SIGINT, SIGTERM};
 
 pub enum Workload {
     Command(Vec<String>),
@@ -501,8 +497,6 @@ fn print_command(cmd: &Command, verbose: bool) {
 
 #[cfg(target_os = "macos")]
 fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
-    use quick_xml::events::Event;
-
     let mut reader = quick_xml::Reader::from_reader(input);
     let mut writer = quick_xml::Writer::new(output);
     let mut buf = Vec::new();
@@ -523,9 +517,7 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
 
 #[cfg(target_os = "macos")]
 #[inline]
-fn demangle_element(
-    element: quick_xml::events::BytesStart,
-) -> std::io::Result<quick_xml::events::BytesStart> {
+fn demangle_element(element: BytesStart) -> std::io::Result<BytesStart> {
     let mut new_element = element.clone();
     new_element.clear_attributes();
 
