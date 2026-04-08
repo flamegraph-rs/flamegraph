@@ -478,7 +478,7 @@ fn run(mut command: Command, verbose: bool, ignore_status: bool) {
 fn terminated_by_error(status: ExitStatus) -> bool {
     status
         .signal() // the default needs to be true because that's the neutral element for `&&`
-        .map_or(true, |code| code != SIGINT && code != SIGTERM)
+        .is_none_or(|code| code != SIGINT && code != SIGTERM)
         && !status.success()
         // on macOS, xctrace captures Ctrl+C and exits with code 54
         && !(cfg!(target_os = "macos") && status.code() == Some(54))
