@@ -14,7 +14,17 @@ use std::os::unix::process::ExitStatusExt;
 use inferno::collapse::perf::{Folder, Options as CollapseOptions};
 
 #[cfg(target_os = "macos")]
-use inferno::collapse::xctrace::Folder;
+use {
+    inferno::collapse::xctrace::Folder,
+    rustc_demangle::try_demangle,
+    std::{
+        borrow::Cow,
+        io::{BufRead, Error, ErrorKind},
+    },
+};
+
+#[cfg(not(target_os = "macos"))]
+use rustc_demangle::demangle_stream;
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use inferno::collapse::dtrace::{Folder, Options as CollapseOptions};
@@ -28,7 +38,6 @@ use clap::{
     Args,
 };
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
-use rustc_demangle::demangle_stream;
 
 pub enum Workload {
     Command(Vec<String>),
@@ -490,6 +499,56 @@ fn print_command(cmd: &Command, verbose: bool) {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
+    use quick_xml::events::Event;
+
+    let mut reader = quick_xml::Reader::from_reader(input);
+    let mut writer = quick_xml::Writer::new(output);
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(el)) => writer.write_event(Event::Start(demangle_element(el)?))?,
+            Ok(Event::Empty(el)) => writer.write_event(Event::Empty(demangle_element(el)?))?,
+            Ok(el) => writer.write_event(el)?,
+            Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
+        }
+        buf.clear();
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[inline]
+fn demangle_element(
+    element: quick_xml::events::BytesStart,
+) -> std::io::Result<quick_xml::events::BytesStart> {
+    let mut new_element = element.clone();
+    new_element.clear_attributes();
+
+    for attr in element.attributes() {
+        let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+
+        let mangled = String::from_utf8_lossy(attr.value.as_ref());
+
+        if let Ok(demangled) = try_demangle(&mangled) {
+            let demangled = format!("{:#}", demangled);
+
+            attr.value = match quick_xml::escape::escape(demangled) {
+                Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
+                Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+            };
+        }
+
+        new_element.push_attribute(attr);
+    }
+
+    Ok(new_element)
+}
+
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
     // Handle SIGINT with an empty handler. This has the
     // implicit effect of allowing the signal to reach the
@@ -530,8 +589,12 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let mut demangled_output = vec![];
 
-    demangle_stream(&mut Cursor::new(output), &mut demangled_output, false)
-        .context("unable to demangle")?;
+    #[cfg(not(target_os = "macos"))]
+    let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output, false);
+    #[cfg(target_os = "macos")]
+    let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output);
+
+    demangle_result.context("unable to demangle")?;
 
     let perf_reader = BufReader::new(&*demangled_output);
 

@@ -29,11 +29,15 @@ opener = "0.8.1"
 shlex = "1.1.0"
 rustc-demangle = { version = "0.1", features = ["std"] }
 
+
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.4.1"
 
 [target.'cfg(windows)'.dependencies]
 blondie = "0.5.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+quick-xml = { version = "0.37", default-features = false }
 
 [profile.release.build-override]
 opt-level = 0
