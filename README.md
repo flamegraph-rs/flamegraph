@@ -39,7 +39,16 @@ your cargo binary directory. On most systems this is something like `~/.cargo/bi
 
 ## Linux
 
-**Note**: If you're using lld or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). For example, for lld:
+**Note**: If you're using lld (which is the default since Rust 1.90.0) or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)).
+
+For example, Rust 1.90.0 and later:
+
+```toml
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Clink-arg=-Wl,--no-rosegment"]
+```
+
+for explicitly configured lld on older toolchains:
 
 ```toml
 [target.x86_64-unknown-linux-gnu]
@@ -57,7 +66,7 @@ rustflags = ["-Clink-arg=-fuse-ld=/usr/local/bin/mold", "-Clink-arg=-Wl,--no-ros
 
 #### Debian (x86 and aarch)
 
-**Note**: Debian bullseye (the current stable version as of 2022) packages an outdated version of Rust which does not meet flamegraph's requirements. You should use [rustup](https://rustup.rs/) to install an up-to-date version of Rust, or upgrade to Debian bookworm (the current testing version) or newer.
+**Note**: Debian bullseye packages an outdated version of Rust which does not meet flamegraph's requirements. You should use [rustup](https://rustup.rs/) to install an up-to-date version of Rust, or upgrade to Debian bookworm or newer.
 
 ```bash
 sudo apt install -y linux-perf
