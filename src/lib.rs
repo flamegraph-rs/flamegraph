@@ -506,7 +506,6 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
         let start = match reader.read_event_into(&mut buf) {
             Ok(Event::Eof) => break,
             Ok(Event::Start(start)) => start,
-            Ok(Event::Empty(start)) => start,
             Ok(el) => {
                 writer.write_event(el)?;
                 continue;
