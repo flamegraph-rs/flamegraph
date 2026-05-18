@@ -26,7 +26,7 @@ clap_complete = "4.0.2"
 indicatif = "0.18.0"
 inferno = { version = "0.12.2", default-features = false, features = ["multithreaded", "nameattr"] }
 opener = "0.8.1"
-shlex = "1.1.0"
+shlex = "2.0.1"
 rustc-demangle = { version = "0.1", features = ["std"] }
 
 [target.'cfg(unix)'.dependencies]
