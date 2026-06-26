@@ -455,6 +455,7 @@ dependencies = [
  "opener",
  "quick-xml 0.40.1",
  "rustc-demangle",
+ "serde_json",
  "shlex",
  "signal-hook",
 ]

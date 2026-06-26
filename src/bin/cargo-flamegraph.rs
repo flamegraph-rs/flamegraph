@@ -1,7 +1,12 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    process::{Command, Output, Stdio},
+};
 
 use anyhow::{anyhow, Context};
-use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package, TargetKind};
+use cargo_metadata::{
+    semver, Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package, TargetKind,
+};
 use clap::{Args, Parser};
 
 use flamegraph::Workload;
@@ -96,8 +101,10 @@ enum Cli {
     Flamegraph(Opt),
 }
 
+#[cfg(unix)]
+static NO_ROSEGMENT_LINK_ARG: &str = "link-arg=-Wl,--no-rosegment";
+
 fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
-    use std::process::{Command, Output, Stdio};
     let mut cmd = Command::new("cargo");
 
     // This will build benchmarks with the `bench` profile. This is needed
@@ -187,6 +194,20 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
         println!("build command: {:?}", cmd);
     }
 
+    #[cfg(unix)]
+    {
+        let (should_add_flag, rustflags_env_var) = should_add_no_rosegment_flag("+nightly")?;
+        if should_add_flag {
+            cmd.env(
+                "RUSTFLAGS",
+                format!(
+                    "{} -C{NO_ROSEGMENT_LINK_ARG}",
+                    rustflags_env_var.as_ref().map_or("", String::as_str)
+                ),
+            );
+        }
+    }
+
     let Output { status, stdout, .. } = cmd
         .stderr(Stdio::inherit())
         .output()
@@ -203,6 +224,167 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
             Err(e) => Some(Err(e).context("failed to parse cargo build output")),
         })
         .collect()
+}
+
+#[cfg(unix)]
+fn should_add_no_rosegment_flag(
+    toolchain_specifier: &'static str,
+) -> anyhow::Result<(bool, Option<String>)> {
+    // `cargo metadata` doesn't provide this, so the `cargo_metadata` crate isn't a help here.
+    let cargo_version_stdout = Command::new("cargo")
+        .arg("--version")
+        .spawn()
+        // .spawn and .wait_with_output don't have distinct enough fail conditions for us to
+        // provide special error messages for each one
+        .and_then(|c| c.wait_with_output())
+        .context("`cargo --version` failed to run")?
+        .stdout;
+
+    let cargo_version = std::str::from_utf8(&cargo_version_stdout)
+        .context("`cargo --version`'s output was not valid utf8")?
+        .split(' ')
+        .nth(1)
+        .ok_or_else(|| anyhow!("`cargo --version` provided an answer in a format unlike the expected 'cargo <version> (<hash> <date>)'"))?;
+
+    let cargo_semver =
+        semver::Version::parse(cargo_version).context("cargo's version was not a valid semver")?;
+
+    let at_least_1_90 = cargo_semver >= semver::Version::new(1, 90, 0);
+    let mut using_gold = false;
+    let mut specified_no_rosegment = false;
+    let mut using_linker_that_needs_flag = false;
+
+    let rustflags_env_var = std::env::var("RUSTFLAGS").ok();
+    if let Some(ref flags) = rustflags_env_var {
+        detect_linker_settings(
+            flags.split(' '),
+            &mut using_gold,
+            &mut specified_no_rosegment,
+            &mut using_linker_that_needs_flag,
+        );
+    }
+
+    let rustc_print_target_output = Command::new("rustc")
+        .args([
+            toolchain_specifier,
+            "-Z",
+            "unstable-options",
+            "--print",
+            "target-spec-json",
+        ])
+        .spawn()
+        .and_then(|c| c.wait_with_output())
+        .context("Failed to execute `rustc` to determine current target")?;
+
+    'get_profile: {
+        if !rustc_print_target_output.status.success() {
+            let rustc_target_json = serde_json::from_slice::<serde_json::Value>(&rustc_print_target_output.stdout)
+                .context("`rustc -Z unstable-options --print target-spec-json` provided non-json output despite exiting with an OK exit code")?;
+
+            let Some(rustc_target) = rustc_target_json
+                .as_object()
+                .and_then(|obj| obj.get("llvm-target"))
+                .and_then(|llvm_target| llvm_target.as_str())
+            else {
+                // It's an unstable feature, so it makes sense it wouldn't stay the same - we should
+                // probably warn here or smth, though, so that someone can report when it changes.
+                break 'get_profile;
+            };
+
+            let cargo_config = Command::new("cargo")
+                .args([
+                    toolchain_specifier,
+                    "-Z",
+                    "unstable-options",
+                    "config",
+                    "get",
+                ])
+                .spawn()
+                .and_then(|c| c.wait_with_output())
+                .context("Failed to execute `cargo` to determine current config options")?;
+
+            // theoretically, we should be able to run nightly options with `cargo` if we can with
+            // `rustc`, but I guess we should be tolerant of if we can't.
+            if !cargo_config.status.success() {
+                break 'get_profile;
+            }
+
+            // it's nightly, it could change I guess. Really shouldn't be non-utf8 but we can't
+            // guarantee anything.
+            let Ok(cargo_opts_utf8) = std::str::from_utf8(&cargo_config.stdout) else {
+                break 'get_profile;
+            };
+
+            // This command outputs a bunch of lines like:
+            // ```
+            // profile.perf.debug = true
+            // profile.perf.inherits = "release"
+            // target.aarch64-unknown-linux-gnu.rustflags = ["-C", "linker=clang"]
+            // ```
+            // So the lines after `target.{triple}.rustflags = ` should be valid json.
+            // Theoretically. I guess they can change the format at any point.
+            let rustflags = cargo_opts_utf8
+                .lines()
+                .find_map(|l| {
+                    let mut splits = l.split(' ');
+                    splits.next().and_then(|config_name| {
+                        if config_name.starts_with("target.")
+                            && config_name.contains(rustc_target)
+                            && config_name.ends_with(".rustflags")
+                        {
+                            // nth(1) because we've already moved over the first one with the
+                            // `.next()`
+                            splits.nth(1)
+                        } else {
+                            None
+                        }
+                    })
+                })
+                // If it's not a json array, anymore, we don't want this to start throwing
+                // errors since it's not stabilized.
+                .and_then(|toml_json| serde_json::from_str::<Vec<&str>>(toml_json).ok());
+
+            // silently ignoring errors here since they're liable to change the format at any time
+            if let Some(target_rustflags) = rustflags {
+                detect_linker_settings(
+                    target_rustflags.into_iter(),
+                    &mut using_gold,
+                    &mut specified_no_rosegment,
+                    &mut using_linker_that_needs_flag,
+                );
+            }
+        }
+    }
+
+    let should_add =
+        ((at_least_1_90 && !using_gold) || using_linker_that_needs_flag) && !specified_no_rosegment;
+    Ok((should_add, rustflags_env_var))
+}
+
+#[cfg(unix)]
+fn detect_linker_settings<'a>(
+    flags: impl Iterator<Item = &'a str>,
+    using_gold: &mut bool,
+    specified_no_rosegment: &mut bool,
+    using_linker_that_needs_flag: &mut bool,
+) {
+    for flag in flags {
+        if flag.starts_with("link-arg=-fuse-ld=") || flag.starts_with("-Clink-arg=-fuse-ld=") {
+            if !*using_gold {
+                *using_gold = flag.ends_with("/ld") || flag.ends_with("/gold");
+            }
+
+            if !*using_linker_that_needs_flag {
+                // does wild need this flag? are there other linkers we should include?
+                *using_linker_that_needs_flag =
+                    flag.ends_with("/wild") || flag.ends_with("/lld") || flag.ends_with("/mold");
+            }
+        }
+
+        if !*specified_no_rosegment {
+            *specified_no_rosegment = flag.ends_with(NO_ROSEGMENT_LINK_ARG);
+        }
+    }
 }
 
 fn workload(opt: &Opt, artifacts: &[Artifact]) -> anyhow::Result<Vec<String>> {

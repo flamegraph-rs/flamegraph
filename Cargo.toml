@@ -28,6 +28,7 @@ inferno = { version = "0.12.2", default-features = false, features = ["multithre
 opener = "0.8.1"
 shlex = "2.0.1"
 rustc-demangle = { version = "0.1", features = ["std"] }
+serde_json = "1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.4.1"
