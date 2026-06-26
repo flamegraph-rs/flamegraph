@@ -23,8 +23,10 @@ jobs:
       with:
         toolchain: stable
         components: rustfmt, clippy
+    - uses: dtolnay/rust-toolchain@nightly
     - run: cargo clippy --all-targets --all-features -- -D warnings
     - run: cargo fmt -- --check
+    - run: cargo test
 
   msrv:
     runs-on: ubuntu-latest

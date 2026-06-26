@@ -196,8 +196,8 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
 
     #[cfg(unix)]
     {
-        let (should_add_flag, rustflags_env_var) = should_add_no_rosegment_flag("+nightly")?;
-        if should_add_flag {
+        let rustflags_env_var = std::env::var("RUSTFLAGS").ok();
+        if should_add_no_rosegment_flag("+nightly", rustflags_env_var.as_deref())? {
             cmd.env(
                 "RUSTFLAGS",
                 format!(
@@ -229,22 +229,26 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
 #[cfg(unix)]
 fn should_add_no_rosegment_flag(
     toolchain_specifier: &'static str,
-) -> anyhow::Result<(bool, Option<String>)> {
+    rustflags_env_var: Option<&str>,
+) -> anyhow::Result<bool> {
     // `cargo metadata` doesn't provide this, so the `cargo_metadata` crate isn't a help here.
     let cargo_version_stdout = Command::new("cargo")
-        .arg("--version")
+        .arg("version")
+        .stdout(Stdio::piped())
         .spawn()
         // .spawn and .wait_with_output don't have distinct enough fail conditions for us to
         // provide special error messages for each one
         .and_then(|c| c.wait_with_output())
-        .context("`cargo --version` failed to run")?
+        .context("`cargo version` failed to run")?
         .stdout;
 
-    let cargo_version = std::str::from_utf8(&cargo_version_stdout)
-        .context("`cargo --version`'s output was not valid utf8")?
+    let cargo_version_utf8 = std::str::from_utf8(&cargo_version_stdout)
+        .context("`cargo version`'s output was not valid utf8")?;
+
+    let cargo_version = cargo_version_utf8
         .split(' ')
         .nth(1)
-        .ok_or_else(|| anyhow!("`cargo --version` provided an answer in a format unlike the expected 'cargo <version> (<hash> <date>)'"))?;
+        .ok_or_else(|| anyhow!("`cargo version` provided an answer in a format unlike the expected 'cargo <version> (<hash> <date>)' (got {cargo_version_utf8:?})"))?;
 
     let cargo_semver =
         semver::Version::parse(cargo_version).context("cargo's version was not a valid semver")?;
@@ -254,8 +258,7 @@ fn should_add_no_rosegment_flag(
     let mut specified_no_rosegment = false;
     let mut using_linker_that_needs_flag = false;
 
-    let rustflags_env_var = std::env::var("RUSTFLAGS").ok();
-    if let Some(ref flags) = rustflags_env_var {
+    if let Some(flags) = rustflags_env_var {
         detect_linker_settings(
             flags.split(' '),
             &mut using_gold,
@@ -264,7 +267,27 @@ fn should_add_no_rosegment_flag(
         );
     }
 
-    let rustc_print_target_output = Command::new("rustc")
+    if let Some(rustflags) = get_rustc_target_from_printing_spec(toolchain_specifier)?
+        .and_then(|target| get_rustflags_from_cargo(&target, toolchain_specifier))
+    {
+        detect_linker_settings(
+            rustflags.iter().map(String::as_str),
+            &mut using_gold,
+            &mut specified_no_rosegment,
+            &mut using_linker_that_needs_flag,
+        );
+    }
+
+    let should_add =
+        ((at_least_1_90 && !using_gold) || using_linker_that_needs_flag) && !specified_no_rosegment;
+    Ok(should_add)
+}
+
+#[cfg(unix)]
+fn get_rustc_target_from_printing_spec(
+    toolchain_specifier: &'static str,
+) -> anyhow::Result<Option<String>> {
+    let Ok(rustc_print_target_output) = Command::new("rustc")
         .args([
             toolchain_specifier,
             "-Z",
@@ -272,98 +295,109 @@ fn should_add_no_rosegment_flag(
             "--print",
             "target-spec-json",
         ])
+        .env("RUSTUP_AUTO_INSTALL", "0")
+        .stdout(Stdio::piped())
         .spawn()
         .and_then(|c| c.wait_with_output())
-        .context("Failed to execute `rustc` to determine current target")?;
+    else {
+        // If this doesn't run correctly, that just means that they don't have nightly installed.
+        // And that's fine.
+        return Ok(None);
+    };
 
-    'get_profile: {
-        if !rustc_print_target_output.status.success() {
-            let rustc_target_json = serde_json::from_slice::<serde_json::Value>(&rustc_print_target_output.stdout)
-                .context("`rustc -Z unstable-options --print target-spec-json` provided non-json output despite exiting with an OK exit code")?;
-
-            let Some(rustc_target) = rustc_target_json
-                .as_object()
-                .and_then(|obj| obj.get("llvm-target"))
-                .and_then(|llvm_target| llvm_target.as_str())
-            else {
-                // It's an unstable feature, so it makes sense it wouldn't stay the same - we should
-                // probably warn here or smth, though, so that someone can report when it changes.
-                break 'get_profile;
-            };
-
-            let cargo_config = Command::new("cargo")
-                .args([
-                    toolchain_specifier,
-                    "-Z",
-                    "unstable-options",
-                    "config",
-                    "get",
-                ])
-                .spawn()
-                .and_then(|c| c.wait_with_output())
-                .context("Failed to execute `cargo` to determine current config options")?;
-
-            // theoretically, we should be able to run nightly options with `cargo` if we can with
-            // `rustc`, but I guess we should be tolerant of if we can't.
-            if !cargo_config.status.success() {
-                break 'get_profile;
-            }
-
-            // it's nightly, it could change I guess. Really shouldn't be non-utf8 but we can't
-            // guarantee anything.
-            let Ok(cargo_opts_utf8) = std::str::from_utf8(&cargo_config.stdout) else {
-                break 'get_profile;
-            };
-
-            // This command outputs a bunch of lines like:
-            // ```
-            // profile.perf.debug = true
-            // profile.perf.inherits = "release"
-            // target.aarch64-unknown-linux-gnu.rustflags = ["-C", "linker=clang"]
-            // ```
-            // So the lines after `target.{triple}.rustflags = ` should be valid json.
-            // Theoretically. I guess they can change the format at any point.
-            let rustflags = cargo_opts_utf8
-                .lines()
-                .find_map(|l| {
-                    let mut splits = l.split(' ');
-                    splits.next().and_then(|config_name| {
-                        if config_name.starts_with("target.")
-                            && config_name.contains(rustc_target)
-                            && config_name.ends_with(".rustflags")
-                        {
-                            // nth(1) because we've already moved over the first one with the
-                            // `.next()`
-                            splits.nth(1)
-                        } else {
-                            None
-                        }
-                    })
-                })
-                // If it's not a json array, anymore, we don't want this to start throwing
-                // errors since it's not stabilized.
-                .and_then(|toml_json| serde_json::from_str::<Vec<&str>>(toml_json).ok());
-
-            // silently ignoring errors here since they're liable to change the format at any time
-            if let Some(target_rustflags) = rustflags {
-                detect_linker_settings(
-                    target_rustflags.into_iter(),
-                    &mut using_gold,
-                    &mut specified_no_rosegment,
-                    &mut using_linker_that_needs_flag,
-                );
-            }
-        }
+    if !rustc_print_target_output.status.success() {
+        return Ok(None);
     }
 
-    let should_add =
-        ((at_least_1_90 && !using_gold) || using_linker_that_needs_flag) && !specified_no_rosegment;
-    Ok((should_add, rustflags_env_var))
+    let rustc_target_json = serde_json::from_slice::<serde_json::Value>(&rustc_print_target_output.stdout)
+        .context("`rustc +nightly -Z unstable-options --print target-spec-json` provided non-json output despite exiting with an OK exit code")?;
+
+    // It's an unstable feature, so it makes sense it wouldn't stay the same - we should
+    // probably warn here or smth if it changes, though, so that someone can report it to us. Or
+    // maybe so that CI can catch it.
+    Ok(rustc_target_json
+        .as_object()
+        .and_then(|obj| obj.get("llvm-target"))
+        .and_then(|llvm_target| llvm_target.as_str())
+        .map(<str>::to_string))
+}
+
+#[cfg(unix)]
+fn get_rustflags_from_cargo(
+    rustc_target: &str,
+    toolchain_specifier: &'static str,
+) -> Option<Vec<String>> {
+    Command::new("cargo")
+        .args([
+            toolchain_specifier,
+            "-Z",
+            "unstable-options",
+            "config",
+            "get",
+        ])
+        .stdout(Stdio::piped())
+        .env("RUSTUP_AUTO_INSTALL", "0")
+        .spawn()
+        .and_then(|c| c.wait_with_output())
+        // If it exits with a non-zero code, that's fine 'cause it's not installed.
+        .ok()
+        .and_then(|output| {
+            get_rustflags_from_cargo_config_output(rustc_target, &output)
+                .map(|flags| flags.into_iter().map(<str>::to_string).collect())
+        })
+}
+
+#[cfg(unix)]
+fn get_rustflags_from_cargo_config_output<'a>(
+    rustc_target: &str,
+    cargo_config_output: &'a Output,
+) -> Option<Vec<&'a str>> {
+    // theoretically, we should be able to run nightly options with `cargo` if we can with
+    // `rustc`, but I guess we should be tolerant of if we can't.
+    if !cargo_config_output.status.success() {
+        return None;
+    }
+
+    // it's nightly, it could change I guess. Really shouldn't be non-utf8 but we can't
+    // guarantee anything.
+    let cargo_opts_utf8 = std::str::from_utf8(&cargo_config_output.stdout).ok()?;
+
+    // This command outputs a bunch of lines like:
+    // ```
+    // profile.perf.debug = true
+    // profile.perf.inherits = "release"
+    // target.aarch64-unknown-linux-gnu.rustflags = ["-C", "linker=clang"]
+    // ```
+    // So the lines after `target.{triple}.rustflags = ` should be valid json.
+    // Theoretically. I guess they can change the format at any point.
+    cargo_opts_utf8
+        .lines()
+        .find_map(|l| {
+            // need to do splitn 'cause there shouldn't be spaces within the key but there will
+            // probably be spaces within the value, and we just want to get the stuff after the
+            // equals
+            let mut splits = l.splitn(3, ' ');
+            splits.next().and_then(|config_name| {
+                if config_name.starts_with("target.")
+                    && config_name.contains(rustc_target)
+                    && config_name.ends_with(".rustflags")
+                {
+                    // nth(1) because we've already moved over the first one with the
+                    // `.next()`
+                    splits.nth(1)
+                } else {
+                    None
+                }
+            })
+        })
+        // If it's not a json array, anymore, we don't want this to start throwing
+        // errors since it's not stabilized.
+        .and_then(|toml_json| serde_json::from_str::<Vec<&str>>(toml_json).ok())
 }
 
 #[cfg(unix)]
 fn detect_linker_settings<'a>(
-    flags: impl Iterator<Item = &'a str>,
+    flags: impl IntoIterator<Item = &'a str>,
     using_gold: &mut bool,
     specified_no_rosegment: &mut bool,
     using_linker_that_needs_flag: &mut bool,
@@ -673,4 +707,130 @@ fn main() -> anyhow::Result<()> {
     let artifacts = build(&opt, kind)?;
     let workload = workload(&opt, &artifacts)?;
     flamegraph::generate_flamegraph_for_workload(Workload::Command(workload), opt.graph)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::process::{ExitStatus, Output};
+
+    macro_rules! pass_if_not_ci {
+        () => {{
+            if std::env::var("CI").is_err() {
+                println!("Silently passing CI-only test since it depends on specific environment details. If you'd like to run it, ensure that you're on a unix machine with the stable and nightly toolchains installed, no target-specific config settings in ~/.cargo/config.toml, and no special RUSTFLAGS set.");
+                return;
+            }
+        }}
+    }
+
+    #[test]
+    fn linker_settings_detected() {
+        let mut using_gold = false;
+        let mut specified_no_rosegment = false;
+        let mut using_linker_that_needs_flag = false;
+
+        detect_linker_settings(
+            ["-C", "linker=clang", "-Clink-arg=-fuse-ld=/usr/bin/wild"],
+            &mut using_gold,
+            &mut specified_no_rosegment,
+            &mut using_linker_that_needs_flag,
+        );
+
+        assert!(!using_gold);
+        assert!(!specified_no_rosegment);
+        assert!(using_linker_that_needs_flag);
+
+        detect_linker_settings(
+            [
+                "-Clinker=clang",
+                "-C",
+                "link-arg=-fuse-ld=/usr/bin/ld",
+                "-Clink-arg=-Wl,--no-rosegment",
+            ],
+            &mut using_gold,
+            &mut specified_no_rosegment,
+            &mut using_linker_that_needs_flag,
+        );
+
+        assert!(using_gold);
+        assert!(specified_no_rosegment);
+        assert!(using_linker_that_needs_flag);
+    }
+
+    #[test]
+    fn ci_gets_target_correctly() {
+        pass_if_not_ci!();
+
+        let expected_target = current_platform::CURRENT_PLATFORM;
+        assert_eq!(
+            get_rustc_target_from_printing_spec("+nightly")
+                .unwrap()
+                .as_deref(),
+            Some(expected_target)
+        );
+    }
+
+    #[test]
+    fn ci_rustflags_is_empty() {
+        pass_if_not_ci!();
+
+        let target = current_platform::CURRENT_PLATFORM;
+        assert_eq!(
+            get_rustflags_from_cargo(target, "+nightly"),
+            Some(Vec::new())
+        );
+    }
+
+    #[test]
+    fn cargo_config_output_works_for_currently_nightly_format() {
+        let target = "x86_64-unknown-linux-gnu";
+        let cargo_stdout = br#"profile.perf.debug = true
+profile.perf.inherits = "release"
+target.aarch64-unknown-linux-gnu.linker = "clang"
+target.aarch64-unknown-linux-gnu.rustdocflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold"]
+target.aarch64-unknown-linux-gnu.rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold", "-Clink-arg=-Wl,--no-rosegment"]
+target.wasm32-unknown-unknown.rustflags = ["-C", "target-feature=+bulk-memory"]
+target.x86_64-pc-windows-gnu.linker = "x86_64-w64-mingw32-gcc"
+target.x86_64-unknown-linux-gnu.linker = "clang"
+target.x86_64-unknown-linux-gnu.rustdocflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/wild"]
+target.x86_64-unknown-linux-gnu.rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/wild"]"#;
+
+        let output = Output {
+            stdout: cargo_stdout.to_vec(),
+            stderr: Vec::new(),
+            status: ExitStatus::default(),
+        };
+        assert_eq!(
+            get_rustflags_from_cargo_config_output(target, &output),
+            Some(vec!["-C", "link-arg=-fuse-ld=/usr/bin/wild"])
+        );
+    }
+
+    #[test]
+    fn ci_no_error_when_using_uninstalled_toolchain() {
+        pass_if_not_ci!();
+
+        assert!(should_add_no_rosegment_flag("+beta", None).unwrap());
+    }
+
+    #[test]
+    fn ci_rustflags_var_parsed() {
+        pass_if_not_ci!();
+
+        let should_add = should_add_no_rosegment_flag(
+            "+nightly",
+            Some("-Clinker=clang -C link-arg=-fuse-ld=/usr/bin/ld"),
+        )
+        .unwrap();
+        // We shouldn't add it because we're specifying the ld linker, which doesn't need it.
+        assert!(!should_add);
+
+        let should_add = should_add_no_rosegment_flag(
+            "+nightly",
+            Some("-Clinker=clang -C link-arg=-fuse-ld=/usr/bin/mold -Clink-arg=-Wl,--no-rosegment"),
+        )
+        .unwrap();
+        // We shouldn't add it because we're already specifying it
+        assert!(!should_add);
+    }
 }
