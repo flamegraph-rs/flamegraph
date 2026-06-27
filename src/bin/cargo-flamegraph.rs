@@ -4,9 +4,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
-use cargo_metadata::{
-    semver, Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package, TargetKind,
-};
+use cargo_metadata::{Artifact, ArtifactDebuginfo, Message, MetadataCommand, Package, TargetKind};
 use clap::{Args, Parser};
 
 use flamegraph::Workload;
@@ -230,6 +228,7 @@ fn build(opt: &Opt, kind: Vec<TargetKind>) -> anyhow::Result<Vec<Artifact>> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod rosegment_detection {
     use super::*;
+    use cargo_metadata::semver;
 
     pub static NO_ROSEGMENT_LINK_ARG: &str = "link-arg=-Wl,--no-rosegment";
 
@@ -779,10 +778,7 @@ mod tests {
         pass_if_not_ci!();
 
         let target = current_platform::CURRENT_PLATFORM;
-        assert_eq!(
-            get_rustflags_from_cargo(target, "+nightly"),
-            Some(Vec::new())
-        );
+        assert_eq!(get_rustflags_from_cargo(target, "+nightly"), None);
     }
 
     #[test]
