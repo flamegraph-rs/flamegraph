@@ -819,9 +819,9 @@ dependencies = [
 
 [[package]]
 name = "inferno"
-version = "0.12.6"
+version = "0.12.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90807d610575744524d9bdc69f3885d96f0e6c3354565b0828354a7ff2a262b8"
+checksum = "d2c05b9ae050366b3363927f59d2c07f922a746e97e2e96f70d479a3c7dbbbe5"
 dependencies = [
  "ahash",
  "crossbeam-channel",
@@ -832,7 +832,7 @@ dependencies = [
  "log",
  "num-format",
  "once_cell",
- "quick-xml 0.39.4",
+ "quick-xml 0.41.0",
  "rgb",
  "str_stack",
 ]
@@ -1119,18 +1119,18 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.39.4"
+version = "0.40.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
+checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
 dependencies = [
  "memchr",
 ]
 
 [[package]]
 name = "quick-xml"
-version = "0.40.1"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
+checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
 ]
