@@ -496,6 +496,13 @@ fn print_command(cmd: &Command, verbose: bool) {
 }
 
 #[cfg(target_os = "macos")]
+fn normalize_demangled_symbol(symbol: String) -> String {
+    // Folded stacks use semicolons as frame separators. Keep semicolons that
+    // occur inside Rust array types from being interpreted as extra frames.
+    symbol.replace(';', ":")
+}
+
+#[cfg(target_os = "macos")]
 fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
     let mut reader = quick_xml::Reader::from_reader(input);
     let mut writer = quick_xml::Writer::new(output);
@@ -521,7 +528,7 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
             let mangled = String::from_utf8_lossy(attr.value.as_ref());
 
             if let Ok(demangled) = try_demangle(&mangled) {
-                let demangled = format!("{demangled:#}");
+                let demangled = normalize_demangled_symbol(format!("{demangled:#}"));
                 attr.value = match quick_xml::escape::escape(demangled) {
                     Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
                     Cow::Owned(s) => Cow::Owned(s.into_bytes()),
@@ -535,6 +542,19 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
     }
 
     Ok(())
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::normalize_demangled_symbol;
+
+    #[test]
+    fn keeps_array_types_inside_one_folded_frame() {
+        assert_eq!(
+            normalize_demangled_symbol("foo::<[u8; 2]>()".to_owned()),
+            "foo::<[u8: 2]>()"
+        );
+    }
 }
 
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
