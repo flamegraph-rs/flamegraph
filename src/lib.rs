@@ -496,13 +496,6 @@ fn print_command(cmd: &Command, verbose: bool) {
 }
 
 #[cfg(target_os = "macos")]
-fn normalize_demangled_symbol(symbol: String) -> String {
-    // Folded stacks use semicolons as frame separators. Keep semicolons that
-    // occur inside Rust array types from being interpreted as extra frames.
-    symbol.replace(';', ":")
-}
-
-#[cfg(target_os = "macos")]
 fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::io::Result<()> {
     let mut reader = quick_xml::Reader::from_reader(input);
     let mut writer = quick_xml::Writer::new(output);
@@ -528,7 +521,9 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
             let mangled = String::from_utf8_lossy(attr.value.as_ref());
 
             if let Ok(demangled) = try_demangle(&mangled) {
-                let demangled = normalize_demangled_symbol(format!("{demangled:#}"));
+                // Folded stacks use semicolons as frame separators. Keep semicolons that
+                // occur inside Rust array types from being interpreted as extra frames.
+                let demangled = format!("{demangled:#}").replace(';', ":");
                 attr.value = match quick_xml::escape::escape(demangled) {
                     Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
                     Cow::Owned(s) => Cow::Owned(s.into_bytes()),
@@ -542,19 +537,6 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
     }
 
     Ok(())
-}
-
-#[cfg(all(test, target_os = "macos"))]
-mod tests {
-    use super::normalize_demangled_symbol;
-
-    #[test]
-    fn keeps_array_types_inside_one_folded_frame() {
-        assert_eq!(
-            normalize_demangled_symbol("foo::<[u8; 2]>()".to_owned()),
-            "foo::<[u8: 2]>()"
-        );
-    }
 }
 
 pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> anyhow::Result<()> {
@@ -836,5 +818,26 @@ impl FlamegraphOptions {
         options.flame_chart = self.flame_chart;
 
         options
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use std::io::Cursor;
+
+    use super::demangle_stream;
+
+    #[test]
+    fn keeps_array_types_inside_one_folded_frame() {
+        let mut input =
+            Cursor::new(br#"<frame name="_RINvCscPdqpYx78pI_8rust_out3fooAhj2_EB2_"></frame>"#);
+        let mut output = Vec::new();
+
+        demangle_stream(&mut input, &mut output).unwrap();
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            r#"<frame name="rust_out::foo::&lt;[u8: 2]&gt;"></frame>"#
+        );
     }
 }
