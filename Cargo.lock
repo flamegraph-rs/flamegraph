@@ -364,6 +364,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61803da095bee82a81bb1a452ecc25d3b2f1416d1897eb86430c6159ef717c17"
 
 [[package]]
+name = "current_platform"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a74858bcfe44b22016cb49337d7b6f04618c58e5dbfdef61b06b8c434324a0bc"
+
+[[package]]
 name = "dashmap"
 version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,11 +473,13 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "clap_complete",
+ "current_platform",
  "indicatif",
  "inferno",
  "opener",
  "quick-xml",
  "rustc-demangle",
+ "serde_json",
  "shlex",
  "signal-hook",
 ]

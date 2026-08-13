@@ -23,8 +23,10 @@ jobs:
       with:
         toolchain: stable
         components: rustfmt, clippy
+    - run: rustup toolchain install nightly # we need nightly for some tests which try to detect rustflags
     - run: cargo clippy --all-targets --all-features -- -D warnings
     - run: cargo fmt -- --check
+    - run: cargo test
 
   msrv:
     runs-on: ubuntu-latest

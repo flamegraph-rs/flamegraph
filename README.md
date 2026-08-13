@@ -39,7 +39,9 @@ your cargo binary directory. On most systems this is something like `~/.cargo/bi
 
 ## Linux
 
-**Note**: If you're using lld (which is the default since Rust 1.90.0) or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)).
+**Note**: If you're using lld (which is the default since Rust 1.90.0) or mold on Linux, you may need to use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). `cargo-flamegraph` tries to add this flag automatically but your setup may require extra configuration.
+
+<details>
 
 For example, Rust 1.90.0 and later:
 
@@ -63,6 +65,8 @@ and for mold:
 linker = "clang"
 rustflags = ["-Clink-arg=-fuse-ld=/usr/local/bin/mold", "-Clink-arg=-Wl,--no-rosegment"]
 ```
+
+</details>
 
 #### Debian (x86 and aarch)
 
