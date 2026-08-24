@@ -3,12 +3,12 @@ use std::os::unix::process::ExitStatusExt;
 #[cfg(target_os = "macos")]
 use std::{
     borrow::Cow,
-    io::{BufRead, Error, ErrorKind},
+    io::{BufRead, Cursor},
 };
 use std::{
     env,
     fs::File,
-    io::{BufReader, BufWriter, Cursor, Read, Write},
+    io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
     process::{exit, Command, ExitStatus, Stdio},
     str::FromStr,
@@ -28,9 +28,6 @@ use inferno::collapse::xctrace::Folder;
 use inferno::{collapse::Collapse, flamegraph::color::Palette, flamegraph::from_reader};
 #[cfg(target_os = "macos")]
 use quick_xml::events::Event;
-#[cfg(not(target_os = "macos"))]
-use rustc_demangle::demangle_stream;
-#[cfg(target_os = "macos")]
 use rustc_demangle::try_demangle;
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
@@ -510,20 +507,37 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
                 writer.write_event(el)?;
                 continue;
             }
-            Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
+            // Fixes #403 (macOS) - xctrace output can be truncated mid-tag,
+            // e.g. by an interrupted (Ctrl-C'd) run, which quick_xml surfaces
+            // as a parse error. Treat that the same as reaching the end of
+            // the stream rather than failing the whole run, so we still emit
+            // a flamegraph from whatever was captured before the truncation.
+            Err(_) => break,
         };
 
         let mut new = start.clone();
         new.clear_attributes();
 
         for attr in start.attributes() {
-            let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-            let mangled = String::from_utf8_lossy(attr.value.as_ref());
+            // A single malformed attribute (e.g. truncated mid-attribute) is
+            // dropped rather than failing the whole run, for the same reason.
+            let Ok(mut attr) = attr else {
+                continue;
+            };
 
-            if let Ok(demangled) = try_demangle(&mangled) {
+            // Same demangling algorithm used for every other platform - see
+            // its docs for why this is both correct and #403-safe. If it
+            // didn't recognize a mangled symbol, `demangled` is byte-for-byte
+            // identical to the original, so we leave `attr.value` completely
+            // untouched rather than needlessly re-escaping already-escaped
+            // raw XML content.
+            let mut demangled = Vec::new();
+            demangle_bytes(attr.value.as_ref(), &mut demangled, false)?;
+
+            if demangled != attr.value.as_ref() {
                 // Folded stacks use semicolons as frame separators. Keep semicolons that
                 // occur inside Rust array types from being interpreted as extra frames.
-                let demangled = format!("{demangled:#}").replace(';', ":");
+                let demangled = String::from_utf8_lossy(&demangled).replace(';', ":");
                 attr.value = match quick_xml::escape::escape(demangled) {
                     Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
                     Cow::Owned(s) => Cow::Owned(s.into_bytes()),
@@ -534,6 +548,71 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
         }
 
         writer.write_event(Event::Start(new))?;
+    }
+
+    Ok(())
+}
+
+/// Scans `input` for candidate Rust-mangled symbols (`_ZN...`/`_R...` followed by
+/// `[A-Za-z0-9_.$]*`) and demangles them, byte-for-byte passing through everything
+/// else unchanged - including any invalid UTF-8, wherever it occurs. This works
+/// because Rust's mangling grammar is pure ASCII, so a matched candidate is always
+/// valid UTF-8, and we never need to interpret the rest of the buffer as text at all.
+/// Used identically on every platform - only the surrounding container format
+/// (plain `perf script` lines vs. xctrace's XML) differs by platform, not this.
+pub fn demangle_bytes<W: Write>(
+    input: &[u8],
+    output: &mut W,
+    include_hash: bool,
+) -> std::io::Result<()> {
+    fn is_candidate_byte(b: u8) -> bool {
+        b == b'$' || b == b'.' || b == b'_' || b.is_ascii_alphanumeric()
+    }
+
+    // Both prefixes start with `_`, which is rare in typical profiler output
+    // (symbol names, addresses, paths), so gating on that single-byte check
+    // before the (still cheap, but pricier) prefix comparison keeps this a
+    // single linear pass over `input` rather than the two substring scans
+    // `rustc_demangle::demangle_line` does per line.
+    fn find_candidate_start(haystack: &[u8]) -> Option<usize> {
+        let mut from = 0;
+        while let Some(offset) = haystack[from..].iter().position(|&b| b == b'_') {
+            let start = from + offset;
+            let rest = &haystack[start..];
+            if rest.starts_with(b"_ZN") || rest.starts_with(b"_R") {
+                return Some(start);
+            }
+            from = start + 1;
+        }
+        None
+    }
+
+    let mut head = 0;
+    while head < input.len() {
+        let next_head = find_candidate_start(&input[head..])
+            .map(|idx| head + idx)
+            .unwrap_or(input.len());
+        output.write_all(&input[head..next_head])?;
+        head = next_head;
+        if head >= input.len() {
+            break;
+        }
+
+        let mut match_end = head;
+        while match_end < input.len() && is_candidate_byte(input[match_end]) {
+            match_end += 1;
+        }
+        let mangled = &input[head..match_end];
+        head = match_end;
+
+        // `mangled` only contains bytes accepted by `is_candidate_byte`, which are
+        // all ASCII, so this is always valid UTF-8.
+        let mangled = std::str::from_utf8(mangled).expect("mangled candidate is ASCII");
+        match try_demangle(mangled) {
+            Ok(demangled) if include_hash => write!(output, "{demangled}")?,
+            Ok(demangled) => write!(output, "{demangled:#}")?,
+            Err(_) => output.write_all(mangled.as_bytes())?,
+        }
     }
 
     Ok(())
@@ -579,8 +658,18 @@ pub fn generate_flamegraph_for_workload(workload: Workload, opts: Options) -> an
 
     let mut demangled_output = vec![];
 
+    // Fixes #403 - profiler output (`perf script`, dtrace, xctrace) is not
+    // guaranteed to be valid UTF-8 as a whole (e.g. a garbled symbol name, or
+    // output truncated mid multi-byte sequence by an interrupted profiler).
+    // `rustc_demangle::demangle_stream` requires the *entire* input to be
+    // UTF-8 because it reads it line-by-line as `&str`, so it bails out hard
+    // on the first bad byte. `demangle_bytes` instead only requires the
+    // *matched mangled-symbol candidates* to be UTF-8 - which they always are,
+    // since Rust's mangling grammar (`_ZN...`/`_R...` plus `[A-Za-z0-9_.$]*`)
+    // is pure ASCII - and passes every other byte through unmodified,
+    // regardless of where in the buffer it appears.
     #[cfg(not(target_os = "macos"))]
-    let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output, false);
+    let demangle_result = demangle_bytes(&output, &mut demangled_output, false);
     #[cfg(target_os = "macos")]
     let demangle_result = demangle_stream(&mut Cursor::new(output), &mut demangled_output);
 
@@ -839,5 +928,66 @@ mod tests {
             String::from_utf8(output).unwrap(),
             r#"<frame name="rust_out::foo::&lt;[u8: 2]&gt;"></frame>"#
         );
+    }
+
+    #[test]
+    fn tolerates_truncated_input() {
+        // Simulates xctrace output cut off mid-tag, e.g. by Ctrl-C.
+        let mut input = Cursor::new(
+            br#"<frame name="_RINvCscPdqpYx78pI_8rust_out3fooAhj2_EB2_"></frame><frame name="_R"#,
+        );
+        let mut output = Vec::new();
+
+        // Must not error out - this is the exact failure mode of #403.
+        demangle_stream(&mut input, &mut output).unwrap();
+
+        // The complete first frame is still emitted; the truncated second
+        // frame is dropped rather than corrupting or failing the whole run.
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            r#"<frame name="rust_out::foo::&lt;[u8: 2]&gt;"></frame>"#
+        );
+    }
+}
+
+#[cfg(test)]
+mod byte_demangle_tests {
+    use super::demangle_bytes;
+
+    #[test]
+    fn demangles_matched_symbols_only() {
+        let input = b"\tffffff _ZN4testE+0x10 (/lib/libfoo.so)\n";
+        let mut output = Vec::new();
+
+        demangle_bytes(input, &mut output, false).unwrap();
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "\tffffff test+0x10 (/lib/libfoo.so)\n"
+        );
+    }
+
+    #[test]
+    fn passes_through_invalid_utf8_untouched() {
+        // 0xff is never valid UTF-8. It sits right next to (and butted up
+        // against) a mangled-looking symbol to make sure the byte scanner
+        // never needs the surrounding bytes to be UTF-8 at all: everything
+        // that isn't itself a clean mangled-symbol match round-trips
+        // byte-for-byte, whether or not it happens to demangle.
+        let input = b"garbled_\xff_ZN4testE_after_\xff".to_vec();
+        let mut output = Vec::new();
+
+        // Must not error out - this is the exact failure mode of #403.
+        demangle_bytes(&input, &mut output, false).unwrap();
+
+        // The trailing `_after_` glues onto the matched candidate (matching
+        // upstream `demangle_line`'s own greedy matching), which makes it not
+        // parse as a bare mangled symbol, so it round-trips unchanged - but
+        // critically byte-for-byte, invalid UTF-8 included.
+        assert_eq!(output, input);
+
+        // Sanity check the input was indeed invalid UTF-8, so this test is
+        // actually exercising the case that broke `demangle_stream`.
+        assert!(std::str::from_utf8(&input).is_err());
     }
 }
