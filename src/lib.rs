@@ -518,15 +518,15 @@ fn demangle_stream<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> std::
 
         for attr in start.attributes() {
             let mut attr = attr.map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-            let mangled = String::from_utf8_lossy(attr.value.as_ref());
+            let mangled = attr.value.as_ref().to_owned();
 
             if let Ok(demangled) = try_demangle(&mangled) {
                 // Folded stacks use semicolons as frame separators. Keep semicolons that
                 // occur inside Rust array types from being interpreted as extra frames.
                 let demangled = format!("{demangled:#}").replace(';', ":");
                 attr.value = match quick_xml::escape::escape(demangled) {
-                    Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
-                    Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+                    Cow::Borrowed(s) => Cow::Borrowed(s),
+                    Cow::Owned(s) => Cow::Owned(s),
                 };
             }
 
