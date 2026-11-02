@@ -33,7 +33,7 @@ rustc-demangle = { version = "0.1", features = ["std"] }
 signal-hook = "0.4.1"
 
 [target.'cfg(windows)'.dependencies]
-blondie = "0.5.2"
+blondie = "0.6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 quick-xml = { version = "0.42", default-features = false }
