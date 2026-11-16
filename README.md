@@ -39,7 +39,7 @@ your cargo binary directory. On most systems this is something like `~/.cargo/bi
 
 ## Linux
 
-**Note**: If you're using lld (which is the default since Rust 1.90.0) or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)).
+**Note**: If you're using lld (which is the default since Rust 1.90.0) or mold on Linux, you must use the `--no-rosegment` flag. Otherwise perf will not be able to generate accurate stack traces ([explanation](https://crbug.com/919499#c16)). Create in project `.cargo/config.toml` and insert next.
 
 For example, Rust 1.90.0 and later:
 
